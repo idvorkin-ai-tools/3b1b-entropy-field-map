@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Entropy, Mapped — 3Blue1Brown's compression series as a field map</title>
+<meta name="description" content="A field map of 3Blue1Brown's Compression is Intelligence series: surprise, information, entropy, cross-entropy and KL divergence in twenty explainer pages, each linked into the video by timestamp, with cleaned transcripts and a concept index." />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="paper.css" />
+<style>
+  main{max-width:960px}
+  .hero{padding:24px 0 8px}
+  .hero h1{font-size:clamp(32px,5.5vw,52px);line-height:1.05;margin:10px 0 14px;letter-spacing:-.01em}
+  .hero .sub{font-size:18px;color:var(--ink-dim);max-width:720px;line-height:1.55}
+  .facts{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin:26px 0 8px}
+  .fact{border:1px solid var(--line-soft);border-radius:8px;padding:12px 14px}
+  .fact .k{font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--ink-dim)}
+  .fact .v{font-size:20px;font-weight:600;margin-top:4px}
+  section{padding:56px 0;border-bottom:1px solid var(--line-soft);scroll-margin-top:64px}
+  section:last-of-type{border-bottom:none}
+  .arc-head{display:flex;align-items:baseline;gap:14px;margin:0 0 6px;flex-wrap:wrap}
+  .arc-head .idx{font-family:'IBM Plex Mono',monospace;font-size:12px;letter-spacing:.14em;color:var(--ink-dim)}
+  .arc-head h2{margin:0;font-size:26px}
+  .arc-sub{color:var(--ink-dim);margin:0 0 22px;max-width:680px}
+  .row{display:grid;grid-template-columns:44px 1fr;gap:14px;padding:16px 0;border-top:1px solid var(--line-soft);align-items:start}
+  .row:first-of-type{border-top:none}
+  .row .num{font-family:'IBM Plex Mono',monospace;font-size:13px;color:var(--ink-dim);padding-top:3px}
+  .row .name{font-weight:600;font-size:17px;line-height:1.3}
+  .row .name a{color:var(--ink)}
+  .row .meta{font-family:'IBM Plex Mono',monospace;font-size:11.5px;color:var(--ink-dim);margin:4px 0 6px;display:flex;flex-wrap:wrap;gap:10px}
+  .row .desc{color:var(--ink-dim);font-size:14.5px;line-height:1.55}
+  .amber .row .name a:hover{color:var(--off)} .cyan .row .name a:hover{color:var(--def)}
+  .check{width:16px;height:16px;border:1px solid var(--ink-dim);border-radius:4px;display:inline-block;vertical-align:-3px;margin-right:6px;cursor:pointer;background:transparent}
+  .check.on{background:var(--off);border-color:var(--off)}
+  .cyan .check.on{background:var(--def);border-color:var(--def)}
+  .spine{list-style:none;padding:0;margin:0 0 8px;display:grid;gap:0}
+  .spine li{display:grid;grid-template-columns:132px 1fr;gap:16px;padding:14px 0;border-top:1px solid var(--line-soft);align-items:baseline}
+  .spine li:first-child{border-top:none}
+  .spine .step{font-family:'IBM Plex Mono',monospace;font-size:12.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--off-bright)}
+  .spine .step.b{color:var(--def)}
+  .spine .say{font-size:15.5px;line-height:1.6}
+  .spine .say b{color:var(--ink)}
+  .links{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:10px}
+  .links a{display:block;border:1px solid var(--line-soft);border-radius:8px;padding:12px 14px;color:var(--ink);text-decoration:none}
+  .links a:hover{border-color:var(--def)}
+  .links a b{display:block;font-size:15px;margin-bottom:3px}
+  .links a span{font-size:13px;color:var(--ink-dim)}
+  .progress{font-family:'IBM Plex Mono',monospace;font-size:12px;color:var(--ink-dim);margin-top:8px}
+  .ex{padding-left:1.25em}
+  .ex li{margin:10px 0;line-height:1.6}
+</style>
+</head>
+<body>
+<header class="bar"><div class="bar-in">
+  <div class="brand"><span class="dot"></span>ENTROPY&nbsp;//&nbsp;FIELD&nbsp;MAP</div>
+  <a class="back" href="https://idvorkin-ai-tools.github.io/">← all maps</a>
+</div></header>
+<main>
+  <div class="hero">
+    <div class="eyebrow"><span class="box wb mono">3BLUE1BROWN · 2020–2026</span><span class="mono">6 videos · 2 h 25 min · 20 pages here</span></div>
+    <h1>Entropy, mapped</h1>
+    <p class="sub">Grant Sanderson's <i>Compression is Intelligence</i> series rebuilds information theory from one question — how short can you make a message? — and walks it all the way to the loss function every language model is trained on. This map splits the two core videos chapter by chapter, adds the Wordle videos where entropy gets used on a real problem and the Hamming videos where redundancy gets added back on purpose, and links every claim into the video at the second it is made.</p>
+    <div class="facts">
+      <div class="fact"><div class="k">Part 1</div><div class="v"><a class="lnk" href="https://youtu.be/l6DKRf-fAAM" target="_blank" rel="noopener">Reinventing Entropy</a></div></div>
+      <div class="fact"><div class="k">Part 2</div><div class="v"><a class="lnk" href="https://youtu.be/GlYgs6v2YfU" target="_blank" rel="noopener">Cross-entropy</a></div></div>
+      <div class="fact"><div class="k">Concepts</div><div class="v"><a class="lnk" href="concepts.html">every term, defined</a></div></div>
+      <div class="fact"><div class="k">Transcripts</div><div class="v"><a class="lnk" href="transcripts/part1.html">all six, timestamped</a></div></div>
+    </div>
+    <p class="progress" id="progress">Tick a page when you have worked through it; this browser remembers.</p>
+  </div>
+
+  <section id="spine">
+    <div class="arc-head"><span class="idx">00</span><h2>The spine</h2></div>
+    <p class="arc-sub">Six ideas, in the order the series earns them. If you read nothing else, read this list — everything below is one of these six unpacked at length.</p>
+    <ul class="spine">
+      <li><span class="step">1 · Surprise</span><span class="say"><b>A message carries information in proportion to how unlikely it was.</b> Something you already expected tells you nothing. The amount of surprise in an outcome of probability <span class="mono">p</span> turns out to be forced to be <span class="mono">log₂(1/p)</span> bits — not chosen, forced, once you insist that independent surprises add. <a class="lnk" href="parts/p04.html">P4</a></span></li>
+      <li><span class="step">2 · Codes</span><span class="say"><b>A short code word is a bet that its symbol is common.</b> Prefix-free codes cost you a budget that must sum to 1, so making one word shorter makes another longer. The best you can do is spend <span class="mono">log₂(1/p)</span> bits on a symbol of probability <span class="mono">p</span>. <a class="lnk" href="parts/p02.html">P2</a> · <a class="lnk" href="parts/p03.html">P3</a></span></li>
+      <li><span class="step">3 · Entropy</span><span class="say"><b>Entropy is the average surprise: <span class="mono">H(p) = Σ p(x)·log₂(1/p(x))</span>.</b> It is the floor on bits per symbol that no encoder can beat, and the yardstick against which every compressor is judged. <a class="lnk" href="parts/p06.html">P6</a></span></li>
+      <li><span class="step b">4 · Cross-entropy</span><span class="say"><b>Cross-entropy is what you actually pay when your model of the world is wrong.</b> Encode with a code built for <span class="mono">q</span> while reality is <span class="mono">p</span> and you pay <span class="mono">H(p,q) = Σ p(x)·log₂(1/q(x))</span> — never less than <span class="mono">H(p)</span>, and equal only when <span class="mono">q = p</span>. <a class="lnk" href="parts/p09.html">P9</a> · <a class="lnk" href="parts/p10.html">P10</a></span></li>
+      <li><span class="step b">5 · KL divergence</span><span class="say"><b>The gap between them is the fine you pay for your wrong beliefs:</b> <span class="mono">D(p‖q) = H(p,q) − H(p)</span>. Zero if and only if you were right, asymmetric, and not a distance. <a class="lnk" href="parts/p15.html">P15</a></span></li>
+      <li><span class="step b">6 · Where the loss comes from</span><span class="say"><b>Training a language model minimises cross-entropy, which is the same thing as building the best possible text compressor.</b> That is not an analogy — it is the same number, and it is why the objective is the log of the probability of the right token and nothing else. <a class="lnk" href="parts/p12.html">P12</a> · <a class="lnk" href="parts/p13.html">P13</a></span></li>
+    </ul>
+  </section>
+
+  <section id="entropy" class="amber">
+    <div class="arc-head"><span class="idx">01 · PART 1 · 32 min</span><h2>Reinventing entropy</h2></div>
+    <p class="arc-sub">A robot on a distant moon needs instructions in as few bits as possible. Six pages take that toy problem to Shannon's definition of entropy, then point it at English and ask how compressible a language actually is. <a class="lnk" href="https://youtu.be/l6DKRf-fAAM" target="_blank" rel="noopener">Watch Part 1 ↗</a> · <a class="lnk" href="transcripts/part1.html">transcript</a></p>
+    <div class="row"><div class="num"><span class="check" data-p="p01"></span>P1</div><div><div class="name"><a href="parts/p01.html">"Compression is intelligence" — what the claim means</a></div><div class="meta"><a class="lnk" href="https://youtu.be/l6DKRf-fAAM?t=0" target="_blank" rel="noopener">▶ 00:00</a><span>3 min</span><span>prediction ≡ compression · why cross-entropy shows up in pre-training</span></div><div class="desc">The thesis of the whole series: a good predictor and a good compressor are the same object, so "how well does this model understand text" and "how small can it make a file" are one question asked twice.</div></div></div>
+    <div class="row"><div class="num"><span class="check" data-p="p02"></span>P2</div><div><div class="name"><a href="parts/p02.html">The warmup: four instructions, three students, and prefix codes</a></div><div class="meta"><a class="lnk" href="https://youtu.be/l6DKRf-fAAM?t=208" target="_blank" rel="noopener">▶ 03:28</a><span>7 min</span><span>variable-length codes · the prefix-free property · decoding as walking a tree</span></div><div class="desc">Encode up/down/left/right with probabilities ½, ¼, ⅛, ⅛. The naive answer is 2 bits; the clever answer is 1.75. Why the receiver can still tell where one code word ends, and what constraint that imposes.</div></div></div>
+    <div class="row"><div class="num"><span class="check" data-p="p03"></span>P3</div><div><div class="name"><a href="parts/p03.html">What perfect compression looks like</a></div><div class="meta"><a class="lnk" href="https://youtu.be/l6DKRf-fAAM?t=646" target="_blank" rel="noopener">▶ 10:46</a><span>4 min</span><span>the code-length budget · why a good code makes every bit a coin flip</span></div><div class="desc">Code lengths are a zero-sum budget: shortening one word lengthens another. The signature of an optimal code is that the output bitstream looks like fair coin flips — no pattern left to exploit.</div></div></div>
+    <div class="row"><div class="num"><span class="check" data-p="p04"></span>P4</div><div><div class="name"><a href="parts/p04.html">Defining information: why log(1/p) and nothing else</a></div><div class="meta"><a class="lnk" href="https://youtu.be/l6DKRf-fAAM?t=887" target="_blank" rel="noopener">▶ 14:47</a><span>3 min</span><span>surprise · additivity over independent events · the bit as a unit</span></div><div class="desc">The definition is not a convention. Demand that the information in two independent events adds, and that certainty carries zero, and the logarithm is the only function left standing.</div></div></div>
+    <div class="row"><div class="num"><span class="check" data-p="p05"></span>P5</div><div><div class="name"><a href="parts/p05.html">The information in language: Shannon's guessing game</a></div><div class="meta"><a class="lnk" href="https://youtu.be/l6DKRf-fAAM?t=1060" target="_blank" rel="noopener">▶ 17:40</a><span>7 min</span><span>letter frequencies · context · Shannon 1951 · bits per character</span></div><div class="desc">English is not a stream of independent letters, so counting letter frequencies badly overestimates its entropy. How Shannon measured the real number using human predictions, and why the answer keeps falling as your model gets better.</div></div></div>
+    <div class="row"><div class="num"><span class="check" data-p="p06"></span>P6</div><div><div class="name"><a href="parts/p06.html">Defining entropy</a></div><div class="meta"><a class="lnk" href="https://youtu.be/l6DKRf-fAAM?t=1469" target="_blank" rel="noopener">▶ 24:29</a><span>7 min</span><span>H(p) = Σ p log(1/p) · the noiseless coding theorem · von Neumann's naming joke</span></div><div class="desc">Average the surprise and you have entropy: a hard floor on bits per symbol, reachable in the limit and beatable never. What the quantity does and does not have to do with thermodynamics.</div></div></div>
+  </section>
+
+  <section id="cross-entropy" class="cyan">
+    <div class="arc-head"><span class="idx">02 · PART 2 · 34 min</span><h2>Cross-entropy, and where the loss function comes from</h2></div>
+    <p class="arc-sub">Nine pages on the quantity you get when your model of the world is wrong: what it measures, why it is the training objective for every language model, why no other objective would do, and the divergence hiding inside it. <a class="lnk" href="https://youtu.be/GlYgs6v2YfU" target="_blank" rel="noopener">Watch Part 2 ↗</a> · <a class="lnk" href="transcripts/part2.html">transcript</a></p>
+    <div class="row"><div class="num"><span class="check" data-p="p07"></span>P7</div><div><div class="name"><a href="parts/p07.html">Language trees and zipping: a family tree from gzip</a></div><div class="meta"><a class="lnk" href="https://youtu.be/GlYgs6v2YfU?t=0" target="_blank" rel="noopener">▶ 00:00</a><span>3 min</span><span>Benedetto–Caglioti–Loreto 2002 · compression as a similarity measure</span></div><div class="desc">Append a document to a corpus, zip it, and see how much it grew. That number alone recovers the tree of European languages — the hook that the rest of the video explains.</div></div></div>
+    <div class="row"><div class="num"><span class="check" data-p="p08"></span>P8</div><div><div class="name"><a href="parts/p08.html">Recap: what makes a code optimal</a></div><div class="meta"><a class="lnk" href="https://youtu.be/GlYgs6v2YfU?t=182" target="_blank" rel="noopener">▶ 03:02</a><span>2 min</span><span>log(1/p) code lengths · entropy as the floor · the one-slide version of Part 1</span></div><div class="desc">The half of Part 1 you need in cache before cross-entropy makes sense, restated compactly and with the fractional-bit caveat spelled out.</div></div></div>
+    <div class="row"><div class="num"><span class="check" data-p="p09"></span>P9</div><div><div class="name"><a href="parts/p09.html">Defining cross-entropy</a></div><div class="meta"><a class="lnk" href="https://youtu.be/GlYgs6v2YfU?t=320" target="_blank" rel="noopener">▶ 05:20</a><span>3 min</span><span>H(p,q) = Σ p log(1/q) · true distribution vs. model distribution · asymmetry</span></div><div class="desc">Two distributions, two roles: one supplies the code words, the other supplies the frequencies. Which is which is the entire content of the definition, and the source of every sign error people make with it.</div></div></div>
+    <div class="row"><div class="num"><span class="check" data-p="p10"></span>P10</div><div><div class="name"><a href="parts/p10.html">Intuition: what a wrong model costs you</a></div><div class="meta"><a class="lnk" href="https://youtu.be/GlYgs6v2YfU?t=506" target="_blank" rel="noopener">▶ 08:26</a><span>5 min</span><span>worked examples · confident and wrong · why H(p,q) ≥ H(p)</span></div><div class="desc">Concrete numbers for a mismatched code, the punishment curve for confident wrong predictions, and the inequality that makes cross-entropy usable as a loss at all.</div></div></div>
+    <div class="row"><div class="num"><span class="check" data-p="p11"></span>P11</div><div><div class="name"><a href="parts/p11.html">Back to the language trees: what zip was measuring</a></div><div class="meta"><a class="lnk" href="https://youtu.be/GlYgs6v2YfU?t=779" target="_blank" rel="noopener">▶ 12:59</a><span>2 min</span><span>the compressor as a model · cross-entropy as a similarity score</span></div><div class="desc">The 2002 result decoded: gzip's dictionary is a crude language model, and the extra bytes are an estimate of the cross-entropy of one language under another's model.</div></div></div>
+    <div class="row"><div class="num"><span class="check" data-p="p12"></span>P12</div><div><div class="name"><a href="parts/p12.html">Pre-training LLMs: the loss function, decoded</a></div><div class="meta"><a class="lnk" href="https://youtu.be/GlYgs6v2YfU?t=895" target="_blank" rel="noopener">▶ 14:55</a><span>6 min</span><span>next-token prediction · softmax · one-hot targets · training as compression</span></div><div class="desc">The line of PyTorch every language model is trained with, read as information theory: the loss is bits per token, the model is a compressor, and gradient descent is shopping for a shorter code book.</div></div></div>
+    <div class="row"><div class="num"><span class="check" data-p="p13"></span>P13</div><div><div class="name"><a href="parts/p13.html">Why this loss and not another one</a></div><div class="meta"><a class="lnk" href="https://youtu.be/GlYgs6v2YfU?t=1238" target="_blank" rel="noopener">▶ 20:38</a><span>6 min</span><span>proper scoring rules · the Lagrange multiplier argument · honesty as the optimum</span></div><div class="desc">Cross-entropy is uniquely minimised by telling the truth about your uncertainty. The constrained-optimisation argument for that, and what goes wrong with the obvious alternatives.</div></div></div>
+    <div class="row"><div class="num"><span class="check" data-p="p14"></span>P14</div><div><div class="name"><a href="parts/p14.html">Distillation: training on a distribution instead of an answer</a></div><div class="meta"><a class="lnk" href="https://youtu.be/GlYgs6v2YfU?t=1573" target="_blank" rel="noopener">▶ 26:13</a><span>4 min</span><span>soft targets · teacher and student · why the wrong answers carry the signal</span></div><div class="desc">Swap the one-hot target for a big model's full distribution and the same formula becomes distillation. Why a teacher's second-best guesses teach more than its best one.</div></div></div>
+    <div class="row"><div class="num"><span class="check" data-p="p15"></span>P15</div><div><div class="name"><a href="parts/p15.html">KL divergence: the gap</a></div><div class="meta"><a class="lnk" href="https://youtu.be/GlYgs6v2YfU?t=1895" target="_blank" rel="noopener">▶ 31:35</a><span>2 min</span><span>D(p‖q) = H(p,q) − H(p) · not a distance · where it shows up elsewhere</span></div><div class="desc">Subtract the unavoidable cost from the cost you paid and what is left is the price of being wrong. Why it is asymmetric, why that is a feature, and where you meet it outside compression.</div></div></div>
+  </section>
+
+  <section id="wordle" class="amber">
+    <div class="arc-head"><span class="idx">03 · 2022 · 41 min</span><h2>Entropy in action: Wordle</h2></div>
+    <p class="arc-sub">The 2022 pair, where the same definitions get pointed at a real optimisation problem — and then at the author's own bug. This is where entropy stops being a formula and becomes a decision rule. <a class="lnk" href="https://youtu.be/v68zYyaEmEA" target="_blank" rel="noopener">Watch ↗</a> · <a class="lnk" href="transcripts/wordle.html">transcript</a></p>
+    <div class="row"><div class="num"><span class="check" data-p="p16"></span>P16</div><div><div class="name"><a href="parts/p16.html">Expected information gain: how to choose a guess</a></div><div class="meta"><a class="lnk" href="https://youtu.be/v68zYyaEmEA?t=0" target="_blank" rel="noopener">▶ 00:00</a><span>18 min</span><span>pattern distributions · entropy of a guess · greedy one-step search</span></div><div class="desc">Every guess splits the remaining words into buckets by colour pattern. The entropy of that split is the expected number of bits you learn, which turns "which word should I play" into an arithmetic problem.</div></div></div>
+    <div class="row"><div class="num"><span class="check" data-p="p17"></span>P17</div><div><div class="name"><a href="parts/p17.html">Priors, two-step search, and what "optimal" actually means</a></div><div class="meta"><a class="lnk" href="https://youtu.be/v68zYyaEmEA?t=1095" target="_blank" rel="noopener">▶ 18:15</a><span>12 min</span><span>word-frequency priors · uncertainty vs. expected score · measured performance</span></div><div class="desc">Maximising information is a proxy, not the goal. Adding a prior over which words are plausible answers and a second ply of search, and the gap between the proxy and the real objective.</div></div></div>
+    <div class="row"><div class="num"><span class="check" data-p="p18"></span>P18</div><div><div class="name"><a href="parts/p18.html">The bug: when the objective you optimise is not the one you meant</a></div><div class="meta"><a class="lnk" href="https://youtu.be/fRed0Xmc2Wg?t=0" target="_blank" rel="noopener">▶ 00:00</a><span>11 min</span><span>the addendum video · the corrected opener · what the error teaches</span></div><div class="desc">A week later, a confession: a small bug in the pattern-matching code had been distorting every number. What changed, what did not, and why this is the most useful ten minutes in the pair. <a class="lnk" href="transcripts/wordle-addendum.html">transcript</a></div></div></div>
+  </section>
+
+  <section id="hamming" class="cyan">
+    <div class="arc-head"><span class="idx">04 · 2020 · 37 min</span><h2>The other direction: redundancy on purpose</h2></div>
+    <p class="arc-sub">Compression removes redundancy. Error correction puts it back, deliberately and efficiently. Shannon's two theorems are the two ends of the same channel, and Hamming codes are the cleanest place to see the second one. <a class="lnk" href="https://youtu.be/X8jsijhllIA" target="_blank" rel="noopener">Watch ↗</a> · <a class="lnk" href="transcripts/hamming1.html">transcript 1</a> · <a class="lnk" href="transcripts/hamming2.html">transcript 2</a></p>
+    <div class="row"><div class="num"><span class="check" data-p="p19"></span>P19</div><div><div class="name"><a href="parts/p19.html">Reinventing Hamming codes</a></div><div class="meta"><a class="lnk" href="https://youtu.be/X8jsijhllIA?t=0" target="_blank" rel="noopener">▶ 00:00</a><span>20 min</span><span>parity · binary search over parity groups · (15,11) and the extended code</span></div><div class="desc">Eleven message bits, four parity bits, and a scheme where the failing parity checks spell out the index of the flipped bit in binary. Derived rather than stated.</div></div></div>
+    <div class="row"><div class="num"><span class="check" data-p="p20"></span>P20</div><div><div class="name"><a href="parts/p20.html">The one-line implementation</a></div><div class="meta"><a class="lnk" href="https://youtu.be/b3NxrZOu_CE?t=0" target="_blank" rel="noopener">▶ 00:00</a><span>17 min</span><span>XOR of the indices of the on bits · one algorithm, several perspectives</span></div><div class="desc">The whole encoder and decoder collapse to an XOR over positions. Why that is the same algorithm as the parity groups, seen from a different angle.</div></div></div>
+  </section>
+
+  <section id="exercises">
+    <div class="arc-head"><span class="idx">05</span><h2>Work it out yourself</h2></div>
+    <p class="arc-sub">Each page sets its own exercises. These are the ones worth doing even if you only skim.</p>
+    <ol class="ex">
+      <li><b>Build the robot's encoder.</b> Take the ½, ¼, ⅛, ⅛ distribution from <a class="lnk" href="parts/p02.html">P2</a>, implement the prefix code, encode ten thousand samples and measure the bits per symbol. Confirm you get 1.75 and not 2. Then change the distribution to be uniform and watch the advantage vanish.</li>
+      <li><b>Measure the entropy of English yourself.</b> Take any book from Project Gutenberg. Compute the entropy of the letter distribution, then of letter pairs given the previous letter, then of triples. Watch the bits-per-character number fall with each order, and compare against the estimates in <a class="lnk" href="parts/p05.html">P5</a>.</li>
+      <li><b>Show the compressor and the model are the same object.</b> Take any small language model, compute its average cross-entropy in bits per character on a held-out text, multiply by the character count, and compare against what <span class="mono">gzip</span>, <span class="mono">xz</span> and <span class="mono">zstd</span> produce on the same file. Details in <a class="lnk" href="parts/p12.html">P12</a>.</li>
+      <li><b>Play the Wordle solver.</b> Implement the entropy-of-the-split scoring from <a class="lnk" href="parts/p16.html">P16</a> over the official word list, look at your top openers, then re-read <a class="lnk" href="parts/p18.html">P18</a> and check your pattern-matching code against the duplicate-letter cases that bit Grant.</li>
+      <li><b>Convince yourself cross-entropy is a proper scoring rule.</b> Fix a true distribution over three outcomes, then grid-search over reported distributions and plot the expected loss. Confirm the minimum sits exactly at the truth, and that squared error does not have the same property in the same way. Argument in <a class="lnk" href="parts/p13.html">P13</a>.</li>
+    </ol>
+  </section>
+
+  <section id="refs">
+    <div class="arc-head"><span class="idx">06</span><h2>Sources</h2></div>
+    <div class="links">
+      <a href="https://youtu.be/l6DKRf-fAAM" target="_blank" rel="noopener"><b>Reinventing Entropy</b><span>3Blue1Brown, 7 Jun 2026, 32 min — Compression is Intelligence, Part 1</span></a>
+      <a href="https://youtu.be/GlYgs6v2YfU" target="_blank" rel="noopener"><b>But what is cross-entropy?</b><span>3Blue1Brown, 16 Jul 2026, 34 min — Compression is Intelligence, Part 2</span></a>
+      <a href="https://youtu.be/v68zYyaEmEA" target="_blank" rel="noopener"><b>Solving Wordle using information theory</b><span>3Blue1Brown, 6 Feb 2022, 31 min</span></a>
+      <a href="https://youtu.be/fRed0Xmc2Wg" target="_blank" rel="noopener"><b>The best Wordle opener is not "crane"</b><span>3Blue1Brown, 13 Feb 2022, 11 min — the addendum</span></a>
+      <a href="https://youtu.be/X8jsijhllIA" target="_blank" rel="noopener"><b>But what are Hamming codes?</b><span>3Blue1Brown, 4 Sep 2020, 20 min</span></a>
+      <a href="https://youtu.be/b3NxrZOu_CE" target="_blank" rel="noopener"><b>Hamming codes, part 2</b><span>3Blue1Brown, 4 Sep 2020, 17 min</span></a>
+      <a href="https://people.math.harvard.edu/~ctm/home/text/others/shannon/entropy/entropy.pdf" target="_blank" rel="noopener"><b>A Mathematical Theory of Communication</b><span>Claude Shannon, 1948 — the paper the series rebuilds</span></a>
+      <a href="https://www.princeton.edu/~wbialek/rome/refs/shannon_51.pdf" target="_blank" rel="noopener"><b>Prediction and Entropy of Printed English</b><span>Claude Shannon, 1951 — the guessing-game measurement in P5</span></a>
+      <a href="https://colah.github.io/posts/2015-09-Visual-Information/" target="_blank" rel="noopener"><b>Visual Information Theory</b><span>Chris Olah, 2015 — the visualisation Grant credits in the description</span></a>
+      <a href="https://github.com/3b1b/videos/tree/master/_2022/wordle" target="_blank" rel="noopener"><b>The Wordle solver code</b><span>3b1b/videos — the actual scripts behind P16–P18</span></a>
+      <a href="https://youtu.be/HZGCoVF3YvM" target="_blank" rel="noopener"><b>Bayes' theorem, the geometry of changing beliefs</b><span>3Blue1Brown, 2019 — not a unit here, but the prior/update background for P17</span></a>
+      <a href="https://idvorkin-ai-tools.github.io/cs336-field-map/" target="_blank" rel="noopener"><b>CS336, mapped</b><span>where the cross-entropy of P12 becomes a training run you write yourself</span></a>
+    </div>
+  </section>
+</main>
+<footer>Original explanation of 3Blue1Brown's entropy and cross-entropy videos. The lessons, animations and framings are Grant Sanderson's; this map explains them in its own words and links back at every timestamp. Built September 2026.</footer>
+<script>
+(function(){
+  var KEY='3b1b-entropy-progress';var st={};try{st=JSON.parse(localStorage.getItem(KEY)||'{}')}catch(e){}
+  var boxes=document.querySelectorAll('.check');
+  function render(){var n=0;boxes.forEach(function(b){var on=!!st[b.dataset.p];b.classList.toggle('on',on);if(on)n++});
+    var p=document.getElementById('progress');if(p)p.textContent=n?n+' of 20 pages done. Tick a page when you have worked through it; this browser remembers.':'Tick a page when you have worked through it; this browser remembers.'}
+  boxes.forEach(function(b){b.addEventListener('click',function(){st[b.dataset.p]=!st[b.dataset.p];try{localStorage.setItem(KEY,JSON.stringify(st))}catch(e){}render()})});
+  render();
+})();
+</script>
+</body>
+</html>
