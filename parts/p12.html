@@ -151,7 +151,7 @@ targets = tokens[:, 1:]             # (B, T)     the token that ACTUALLY came ne
 # The target distribution p at each position is one-hot on targets[b, t]:
 #     H(p, q) = sum_i p_i * (-log q_i)
 #             =    0 * (-log q_0) + ... + 1 * (-log q_c) + ... + 0 * (-log q_V)
-#             = -log q_c                     <-- every p_i = 0 term is annihilated
+#             = -log q_c                     &lt;-- every p_i = 0 term is annihilated
 # F.cross_entropy IS that collapse, fused with the softmax, reported in NATS:
 loss = F.cross_entropy(logits.reshape(-1, V), targets.reshape(-1))
 

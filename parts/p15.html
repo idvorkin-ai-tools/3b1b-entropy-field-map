@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>P15 KL divergence: the gap — Entropy, mapped</title>
+<meta name="description" content="KL divergence is cross-entropy minus entropy: the extra bits you pay for modelling p with q. Non-negative, asymmetric, and not a distance." />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="../paper.css" />
+</head>
+<body>
+<header class="bar"><div class="bar-in">
+  <div class="brand"><span class="dot"></span>ENTROPY&nbsp;//&nbsp;FIELD&nbsp;MAP</div>
+  <a class="back" href="../index.html#cross-entropy">← field map</a>
+</div></header>
+<main>
+  <div class="eyebrow"><span class="box bb mono">P15 · CROSS-ENTROPY</span><span class="mono">3Blue1Brown · 31:35–33:51 · 2 min</span></div>
+  <h1>KL divergence: the gap</h1>
+  <div class="authors">The closing footnote of "But what is cross-entropy?" — after the sponsor break, Grant names the quantity everyone actually cites in papers, and leaves three puzzles.</div>
+  <div class="paperlink" style="border-left-color:var(--def)"><span class="lbl">Watch</span><a href="https://youtu.be/GlYgs6v2YfU?t=1895" target="_blank" rel="noopener">But what is cross-entropy? | Compression is Intelligence Part 2 — 3Blue1Brown, from 31:35 ↗</a></div>
+  <p class="mono" style="font-size:12.5px;color:var(--ink-dim)">Transcript: <a class="lnk" href="../transcripts/part2.html#s-1895">this stretch, timestamped</a></p>
+
+  <div class="tldr"><b>TL;DR —</b> Cross-entropy <span class="mono">H(p,q)</span> bottoms out at <span class="mono">H(p)</span>, and it does so exactly when <span class="mono">q = p</span>. Name the leftover and you have the Kullback–Leibler divergence: <span class="mono">D(p‖q) = H(p,q) − H(p) = Σ p(x)·log₂(p(x)/q(x))</span> — the bits per symbol you waste by coding for <span class="mono">q</span> when reality is <span class="mono">p</span>. It is never negative, it is zero only when the two distributions agree, and it is not a distance: it is asymmetric and it fails the triangle inequality, which is why the word is <em>divergence</em>. The one thing to carry: because <span class="mono">H(p)</span> does not depend on <span class="mono">q</span>, minimising cross-entropy over <span class="mono">q</span> and minimising KL over <span class="mono">q</span> are the same optimisation with different zero points — which is why ML papers use the two words almost interchangeably.</div>
+
+  <p class="lead">Everything before this page has been about <span class="mono">H(p,q)</span> — the average number of bits you spend when your code is tuned for <span class="mono">q</span> and the world hands you <span class="mono">p</span>. <a class="lnk" href="p14.html">P14</a> pushed that all the way to distillation, where both slots hold a model's full distribution. But <span class="mono">H(p,q)</span> has an awkward property for anyone who wants to read it as an <em>error</em>: at the optimum it does not go to zero, it goes to <span class="mono">H(p)</span>, the irreducible entropy of the data. That floor is an accounting nuisance. Subtract it and you get a quantity that <em>is</em> zero at the optimum — the KL divergence. Grant introduces it in the last two minutes as a footnote, then hands you three things to ponder. This page takes the footnote seriously: the algebra, the proof that it can't go negative, the reason it isn't a metric, and the practical consequence — forward versus reverse KL — that people get wrong most often.</p>
+
+  <h2 id="outline">Outline, with timestamps</h2>
+  <ul class="outline">
+    <li><a href="https://youtu.be/GlYgs6v2YfU?t=1895" target="_blank" rel="noopener">31:35</a> — Setup: recall the one key property — <span class="mono">H(p,q)</span> is minimal exactly when <span class="mono">q = p</span>.</li>
+    <li><a href="https://youtu.be/GlYgs6v2YfU?t=1905" target="_blank" rel="noopener">31:45</a> — Naming the gap: that minimum equals <span class="mono">H(p)</span>, and the difference is the Kullback–Leibler divergence.</li>
+    <li><a href="https://youtu.be/GlYgs6v2YfU?t=1905" target="_blank" rel="noopener">31:45</a> — Compression reading: KL is the bits per symbol wasted by a badly matched code — the robot ledger, redone.</li>
+    <li><a href="https://youtu.be/GlYgs6v2YfU?t=1937" target="_blank" rel="noopener">32:17</a> — Distance-ish, but not a distance: zero when equal, grows as they differ, asymmetric.</li>
+    <li><a href="https://youtu.be/GlYgs6v2YfU?t=1967" target="_blank" rel="noopener">32:47</a> — Ponder 1 and 2: the compact one-sum form, and how the bar diagram encodes it.</li>
+    <li><a href="https://youtu.be/GlYgs6v2YfU?t=1999" target="_blank" rel="noopener">33:19</a> — Ponder 3: in distillation, what changes if you swap cross-entropy for KL?</li>
+  </ul>
+
+  <h2 id="definition">The definition is a subtraction — and the compact form is the same subtraction <a class="lnk" href="https://youtu.be/GlYgs6v2YfU?t=1905" target="_blank" rel="noopener">31:45</a></h2>
+
+  <p>Fix the truth <span class="mono">p</span> and let the model <span class="mono">q</span> vary. Cross-entropy as a function of <span class="mono">q</span> has a single minimum, and the minimum sits at <span class="mono">q = p</span> with value <span class="mono">H(p)</span> — the green curve Grant traced out earlier in the video by sliding <span class="mono">p</span> around and following the bottom of each cross-entropy curve <a class="lnk" href="https://youtu.be/GlYgs6v2YfU?t=716" target="_blank" rel="noopener">11:56</a>. So there are two numbers in play at every <span class="mono">q</span>: what you actually pay, and the best anyone could pay. The divergence is the difference.</p>
+
+<pre class="code-block">D(p‖q)  =  H(p,q)  −  H(p)
+        =  Σ p(x)·log₂(1/q(x))  −  Σ p(x)·log₂(1/p(x))
+        =  Σ p(x)·[ log₂(1/q(x)) − log₂(1/p(x)) ]
+        =  Σ p(x)·log₂( p(x) / q(x) )</pre>
+
+  <p>That last line is Grant's first thing-to-ponder, and the derivation is the whole of it: both sums are weighted by the <em>same</em> weights <span class="mono">p(x)</span>, so you can pull them under one summation sign and let the logs combine. Nothing subtle happens. What the compact form buys you is that it is a single sum; what it costs you is that it hides the fact that this is a difference of two interpretable quantities, one of which — <span class="mono">H(p)</span> — is a property of the world and not of your model.</p>
+
+  <p>Grant's second thing-to-ponder is the picture. Throughout the video, cross-entropy is drawn as a bar chart whose bars have width <span class="mono">p(x)</span> and height <span class="mono">log₂(1/q(x))</span>, so the total area is <span class="mono">H(p,q)</span>; entropy is the same chart with heights <span class="mono">log₂(1/p(x))</span>. KL is the difference of the two areas, which means: keep the widths <span class="mono">p(x)</span>, and set each bar's height to <span class="mono">log₂(p(x)/q(x))</span>. <b>My addition, worth stating because the diagram doesn't:</b> that height is <em>negative</em> for every symbol where <span class="mono">q(x) &gt; p(x)</span> — the model over-predicts, so its code word for that symbol is shorter than optimal and you actually save bits there. KL is a <em>signed</em> area, with bars below the axis, and the theorem below is that the bars above always outweigh the bars below.</p>
+
+  <h2 id="nonneg">Why the bars above always win — Gibbs' inequality</h2>
+
+  <p><b>This section is my addition;</b> Grant asserts non-negativity implicitly by saying cross-entropy has a minimum at <span class="mono">q = p</span>, but the standard one-line proof is worth having, because it also tells you exactly when equality holds.</p>
+
+  <p>Look at <span class="mono">−D(p‖q) = Σ p(x)·log₂(q(x)/p(x))</span>. The <span class="mono">log</span> function is strictly concave, and the <span class="mono">p(x)</span> are non-negative weights summing to 1, so Jensen's inequality lets you move the log outside the average:</p>
+
+<pre class="code-block">−D(p‖q)  =  Σ p(x)·log₂( q(x)/p(x) )
+         ≤  log₂( Σ p(x) · q(x)/p(x) )        [Jensen, log is concave]
+         =  log₂( Σ_{x : p(x)>0} q(x) )
+         ≤  log₂(1)  =  0
+
+⇒  D(p‖q) ≥ 0, with equality iff q = p.</pre>
+
+  <p>The first inequality is tight only when <span class="mono">q(x)/p(x)</span> takes the same value everywhere <span class="mono">p</span> has mass (strict concavity); the second is tight only when <span class="mono">q</span> puts none of its mass outside <span class="mono">p</span>'s support. Together those force the common ratio to be 1, i.e. <span class="mono">q = p</span>. This result is <b>Gibbs' inequality</b> — equivalently, it is the statement that no code can beat the entropy, which is the same fact <a class="lnk" href="p04.html">the source-coding argument</a> established from the compression side. The two directions of the series meet here.</p>
+
+  <div class="callout"><b>Carry this:</b> <span class="mono">D(p‖q) ≥ 0</span> is not a convention or a normalisation — it is a theorem, and it is the mathematical content of "you cannot compress below the entropy". Any time you see a loss reported as a KL and it comes out negative, you have a bug: an unnormalised <span class="mono">q</span>, a density where you meant a probability mass (differential entropy is <em>not</em> bounded below, but KL between two densities still is), or the arguments swapped in a way that also swapped a sign.</div>
+
+  <h2 id="robot">The robot ledger: 0.875 bits wasted per instruction <a class="lnk" href="https://youtu.be/GlYgs6v2YfU?t=1937" target="_blank" rel="noopener">32:17</a></h2>
+
+  <blockquote class="q"><span>"In the language of compression, you would think of it as describing how many bits per symbol are you wasting by using a poorly optimized code."</span><span class="cite">— Grant Sanderson, <a href="https://youtu.be/GlYgs6v2YfU?t=1905" target="_blank" rel="noopener">31:45</a></span></blockquote>
+
+  <p>The video's running example makes this concrete, and it is worth doing the arithmetic yourself. The original mission had the robot going up half the time, down a quarter, left and right an eighth each <a class="lnk" href="https://youtu.be/GlYgs6v2YfU?t=218" target="_blank" rel="noopener">3:38</a> — call that <span class="mono">q</span>, and note that the optimal code for it is exactly 1, 2, 3, 3 bits, because those probabilities are all powers of ½. Then the mission is rotated: right becomes half, left a quarter, up and down an eighth each — call that <span class="mono">p</span>. The encoder is hard-coded, so you keep paying <span class="mono">q</span>'s code lengths at <span class="mono">p</span>'s frequencies <a class="lnk" href="https://youtu.be/GlYgs6v2YfU?t=341" target="_blank" rel="noopener">5:41</a>.</p>
+
+  <table class="kv">
+    <tr><th>symbol</th><th>q(x) — old plan</th><th>code length log₂(1/q)</th><th>p(x) — new plan</th><th>p·length</th><th>p·log₂(p/q)</th></tr>
+    <tr><td>up</td><td>1/2</td><td>1 bit</td><td>1/8</td><td>0.125</td><td>−0.250</td></tr>
+    <tr><td>down</td><td>1/4</td><td>2 bits</td><td>1/8</td><td>0.250</td><td>−0.125</td></tr>
+    <tr><td>left</td><td>1/8</td><td>3 bits</td><td>1/4</td><td>0.750</td><td>+0.250</td></tr>
+    <tr><td>right</td><td>1/8</td><td>3 bits</td><td>1/2</td><td>1.500</td><td>+1.000</td></tr>
+    <tr><td><b>total</b></td><td>—</td><td>—</td><td>—</td><td><b>H(p,q) = 2.625</b></td><td><b>D(p‖q) = 0.875</b></td></tr>
+  </table>
+
+  <p>The new distribution is a permutation of the old one, so it has the same entropy: <span class="mono">H(p) = ½·1 + ¼·2 + ⅛·3 + ⅛·3 = 1.75</span> bits. And <span class="mono">2.625 − 1.75 = 0.875</span> — which matches the last column exactly, as the algebra above says it must. So the stale code costs you seven-eighths of a bit on every instruction sent, a 50% overhead on a 1.75-bit budget. Notice the last column's <em>signs</em>: you gain on left and right, whose code words are now too long for how often they occur, and you lose on up and down. The gains are real; they are just smaller than the losses.</p>
+
+  <p><b>A trap in this particular example, and my addition:</b> here <span class="mono">D(q‖p)</span> also equals 0.875, because <span class="mono">p</span> is a relabelling of <span class="mono">q</span> under the swap up↔right, down↔left, so the two divergences are forced to agree. Do not learn asymmetry from the robot. Learn it from the next section.</p>
+
+  <h2 id="notmetric">Divergence, not distance <a class="lnk" href="https://youtu.be/GlYgs6v2YfU?t=1937" target="_blank" rel="noopener">32:17</a></h2>
+
+  <p>KL behaves like a distance in the two ways you first check — it is zero when the distributions match and grows as they separate — and then fails the other two axioms outright. Grant flags the first failure: <span class="mono">D(p‖q) ≠ D(q‖p)</span>. His own two-outcome example earlier in the video supplies the numbers. Take the even distribution <span class="mono">(½, ½)</span> and the skewed one <span class="mono">(0.9, 0.1)</span>:</p>
+
+  <table class="kv">
+    <tr><th>direction</th><th>H(p,q)</th><th>H(p)</th><th>D(p‖q)</th></tr>
+    <tr><td>p = (0.9, 0.1), q = (½, ½)</td><td>1.000 bits</td><td>0.469 bits</td><td><b>0.531 bits</b></td></tr>
+    <tr><td>p = (½, ½), q = (0.9, 0.1)</td><td>1.737 bits</td><td>1.000 bits</td><td><b>0.737 bits</b></td></tr>
+  </table>
+
+  <p>Both cross-entropies are Grant's <a class="lnk" href="https://youtu.be/GlYgs6v2YfU?t=562" target="_blank" rel="noopener">9:22</a>–<a class="lnk" href="https://youtu.be/GlYgs6v2YfU?t=592" target="_blank" rel="noopener">9:52</a> numbers — 1 bit one way, "around 1.74 bits" the other. Subtract the right entropy from each and you see the divergences differ too: 0.531 against 0.737. Same pair of distributions, two different answers depending on which one you call the truth.</p>
+
+  <p>The second failure is less advertised and worth verifying, so <b>I checked it</b>: KL also violates the triangle inequality. Take three distributions on two outcomes, <span class="mono">a = (0.9, 0.1)</span>, <span class="mono">b = (0.5, 0.5)</span>, <span class="mono">c = (0.1, 0.9)</span>. Then <span class="mono">D(a‖c) = 2.536</span> bits, while <span class="mono">D(a‖b) + D(b‖c) = 0.531 + 0.737 = 1.268</span> bits. Going "via <span class="mono">b</span>" is less than half as expensive as going direct, so <span class="mono">D(a‖c) ≤ D(a‖b) + D(b‖c)</span> is false by a factor of two. A quantity that is neither symmetric nor triangle-obeying is not a metric, and the word <em>divergence</em> is the field's way of saying so out loud. (It is not lawless, though: KL is jointly convex in its two arguments, and Pinsker's inequality bounds total variation distance below it, <span class="mono">‖p − q‖_TV ≤ √(D(p‖q)·ln2 / 2)</span> with <span class="mono">D</span> in bits. So small KL does imply the distributions are genuinely close — the converse direction is what fails.)</p>
+
+  <h2 id="direction">Forward vs reverse: covering versus collapsing</h2>
+
+  <p><b>My addition, and the practically important half of the asymmetry.</b> Which slot you put the truth in changes what your fitted <span class="mono">q</span> looks like, and the mechanism is visible directly in the formula <span class="mono">Σ p(x)·log₂(p(x)/q(x))</span>.</p>
+
+  <p><b>Forward KL, <span class="mono">D(p‖q)</span> — truth first, model second.</b> The sum is weighted by <span class="mono">p</span>, so only symbols the truth actually produces contribute. But wherever <span class="mono">p(x) &gt; 0</span> and <span class="mono">q(x) → 0</span>, the term <span class="mono">p(x)·log₂(p(x)/q(x)) → +∞</span>. The model is punished without bound for assigning near-zero probability to something that happens. Conversely, where <span class="mono">p(x) = 0</span> the term is 0 no matter what <span class="mono">q</span> does (using the standard convention <span class="mono">0·log 0 = 0</span>), so the model pays nothing for hallucinating mass in empty regions. Net effect: <span class="mono">q</span> spreads out to cover every mode of <span class="mono">p</span>. This is called <b>mass-covering</b>, or <b>mean-seeking</b> — a Gaussian fit to a two-humped truth by forward KL straddles both humps and puts its peak in the valley between them.</p>
+
+  <p><b>Reverse KL, <span class="mono">D(q‖p)</span> — model first, truth second.</b> Now the weights are <span class="mono">q(x)</span>, so a region the model ignores costs nothing at all: if <span class="mono">q(x) = 0</span>, that term vanishes regardless of how much mass <span class="mono">p</span> has there. What is punished infinitely is the reverse — putting <span class="mono">q</span>'s mass where <span class="mono">p</span> has essentially none. Net effect: <span class="mono">q</span> retreats onto whichever single region of <span class="mono">p</span> it can fit inside, and abandons the rest. This is <b>mode-seeking</b>, or <b>zero-forcing</b>.</p>
+
+  <p>Here is a discrete case you can check by hand. Let the truth be bimodal over five bins, <span class="mono">p = (0.45, 0.04, 0.02, 0.04, 0.45)</span>, with <span class="mono">H(p) = 1.521</span> bits, and score three candidate models under each direction:</p>
+
+  <table class="kv">
+    <tr><th>candidate q</th><th>shape</th><th>D(p‖q) — forward</th><th>D(q‖p) — reverse</th></tr>
+    <tr><td>(0.70, 0.20, 0.06, 0.03, 0.01)</td><td>sits on one mode</td><td>2.077 bits</td><td><b>0.938 bits ← best</b></td></tr>
+    <tr><td>(0.20, 0.20, 0.20, 0.20, 0.20)</td><td>covers both modes</td><td><b>0.801 bits ← best</b></td><td>1.125 bits</td></tr>
+    <tr><td>(0.10, 0.25, 0.30, 0.25, 0.10)</td><td>peaks in the valley</td><td>1.663 bits</td><td>2.060 bits</td></tr>
+  </table>
+
+  <p>The two columns pick different winners from the same three candidates. Forward KL takes the flat coverer; reverse KL takes the single-mode collapse. (Both reject the third candidate, which piles mass into the low-probability valley — reverse KL especially, since that is precisely its forbidden move.)</p>
+
+  <div class="callout"><b>Which one does training use?</b> <b>Forward.</b> Pre-training and distillation both minimise <span class="mono">H(p,q)</span> over the model <span class="mono">q</span> with the data or teacher in the <span class="mono">p</span> slot <a class="lnk" href="https://youtu.be/GlYgs6v2YfU?t=1622" target="_blank" rel="noopener">27:02</a>, which is <span class="mono">D(p‖q)</span> up to a constant. That is the mass-covering direction, and it is a design choice with consequences: a base language model trained this way would rather put a little probability on everything plausible than sharpen onto one answer. The sharpening happens later, in fine-tuning and decoding. Reverse KL is the one you meet in variational inference and in most RL-with-KL-penalty objectives, where the thing being optimised sits in the first slot — and mode-collapse there is a known failure mode, not a surprise.</div>
+
+  <h2 id="interchangeable">Why the two words get used interchangeably — and Grant's third puzzle <a class="lnk" href="https://youtu.be/GlYgs6v2YfU?t=1999" target="_blank" rel="noopener">33:19</a></h2>
+
+  <blockquote class="q"><span>"I want you to ask yourself, what would happen if instead you used the KL divergence? After all, if the KL divergence is like a distance measure, wouldn't this be a more natural choice?"</span><span class="cite">— Grant Sanderson, <a href="https://youtu.be/GlYgs6v2YfU?t=1999" target="_blank" rel="noopener">33:19</a></span></blockquote>
+
+  <p><b>Spoiler for the puzzle, with the reasoning.</b> In distillation the teacher is frozen: <span class="mono">p</span> is a fixed distribution and only the student's parameters <span class="mono">θ</span> move. So</p>
+
+<pre class="code-block">D(p‖q_θ)  =  H(p, q_θ)  −  H(p)
+                            └──────┘
+                       constant in θ
+
+⇒  ∇_θ D(p‖q_θ)  =  ∇_θ H(p, q_θ)</pre>
+
+  <p>The gradients are <em>identical</em>. Swapping cross-entropy for KL changes the reported loss by a constant offset and changes nothing about the parameter updates, the optimum, or the trained model. The only thing you gain is interpretability of the number on the screen: KL bottoms out at 0, so "loss 0.03" means "0.03 bits per token worse than the teacher", whereas cross-entropy bottoms out at the teacher's own entropy and you cannot tell from the number alone how much room is left. The only thing you lose is one extra computation per step (you have to evaluate <span class="mono">H(p)</span>). In ordinary pre-training the same argument holds with <span class="mono">p</span> the empirical data distribution — and there it is even more thoroughly a constant, since it does not depend on the model at all.</p>
+
+  <p>That constant-offset identity is why ML writing slides between "cross-entropy loss" and "KL loss" without ceremony. They are the same objective. The distinction only bites when <span class="mono">p</span> itself is being learned — in a VAE, in an EM step, in any objective where both arguments move — and then you have to be careful about which term you dropped.</p>
+
+  <h2 id="onward">Where KL turns up next, and what Part 3 owes us <a class="lnk" href="https://youtu.be/GlYgs6v2YfU?t=1782" target="_blank" rel="noopener">29:42</a></h2>
+
+  <p>Four places you will meet this formula again, each stated only as far as I can state it accurately:</p>
+
+  <ul class="outline">
+    <li><b>The variational lower bound (ELBO), in VAEs and variational inference.</b> For a latent-variable model, <span class="mono">log p(x) = ELBO(q) + D(q(z|x) ‖ p(z|x))</span>. Because KL is non-negative, the ELBO is a genuine lower bound on the log-evidence, and the slack is <em>exactly</em> the KL from your approximate posterior to the true one. Maximising the ELBO is therefore the same as minimising that KL. Note the argument order: the approximation is in the first slot, so this is reverse KL — which is why variational posteriors are famously too narrow.</li>
+    <li><b>The KL penalty in RLHF.</b> Objectives of the form "maximise reward, minus <span class="mono">β</span> times the KL from the current policy to the frozen reference policy" keep a fine-tuned model from drifting off the manifold its pre-training put it on. The policy sits in the first slot; the penalty is estimated from sampled tokens rather than summed exactly, since the sum over all sequences is intractable.</li>
+    <li><b>Mutual information.</b> <span class="mono">I(X;Y) = D( p(x,y) ‖ p(x)·p(y) )</span> — mutual information <em>is</em> a KL divergence, between the joint distribution and the product of the marginals. Everything you now know about KL (non-negativity, zero iff equal) immediately gives you the corresponding facts about mutual information: it is never negative, and it is zero exactly when the variables are independent.</li>
+    <li><b>Model selection.</b> Akaike's information criterion is derived as an estimate of the expected KL divergence from the true data-generating distribution to the fitted model — which is why AIC is an <em>information</em> criterion and not an arbitrary penalty on parameter count.</li>
+  </ul>
+
+  <p>As for Part 3: this video is explicit that it is not finished. Grant closes by promising "one very visual and very beautiful compression algorithm" that turns a general predictor into a compressor, so that the number of bits spent on a text matches its information content from the model's perspective — and that once you have it, cross-entropy training is <em>literally</em> training the best possible text compressor, which finally lets the series confront the phrase "compression is intelligence" head-on <a class="lnk" href="https://youtu.be/GlYgs6v2YfU?t=1782" target="_blank" rel="noopener">29:42</a>. He does not name the algorithm. <b>My guess, flagged as a guess:</b> the description fits arithmetic coding — it encodes a whole message as a single number inside a nested subdivision of the unit interval, its output length tracks <span class="mono">−Σ log₂ q</span> almost exactly rather than rounding each symbol up to a whole bit, and the interval picture is exactly the kind of thing that animates well. <b>Part 3 was not released at the time of writing, so treat all of that as unconfirmed.</b></p>
+
+  <p>This page is the end of the cross-entropy arc. From here the map turns to the other thing entropy is for: not measuring how wrong a model is, but choosing what to do next. <a class="lnk" href="p16.html">P16</a> starts the Wordle arc, where expected information gain — an entropy computation you can do on your laptop — picks the guess that on average tells you the most.</p>
+
+  <h2 id="stuck">Where people get stuck</h2>
+
+  <p><b>"Which distribution goes in which slot?"</b> The convention in <span class="mono">D(p‖q)</span> is: <span class="mono">p</span> is the truth, the reference, the thing that generates the data and supplies the weights; <span class="mono">q</span> is the model, the approximation, the thing whose code lengths you are stuck paying. Read <span class="mono">‖</span> as "of, relative to" and read the whole thing as "the bits per symbol wasted by using <span class="mono">q</span>'s code on <span class="mono">p</span>'s data". Sanity check: the weights <span class="mono">p(x)</span> outside the log always belong to the <em>first</em> argument. Be warned that the notation for cross-entropy is genuinely inconsistent across sources — the video says as much — so when reading a paper, find the summation and look at which letter is the weight rather than trusting the argument order.</p>
+
+  <p><b>"It's a distance, so surely it's symmetric."</b> This is the single most common error, and it is expensive because the two directions fit visibly different models (see the table above). If you need an actual metric, the standard repairs are the symmetrised Jensen–Shannon divergence, <span class="mono">JSD(p,q) = ½D(p‖m) + ½D(q‖m)</span> with <span class="mono">m = ½(p+q)</span> — whose square root <em>is</em> a metric, and which is finite even when the supports don't overlap — or a genuinely different family like total variation or Wasserstein distance. Do not just average <span class="mono">D(p‖q)</span> and <span class="mono">D(q‖p)</span> and hope; that fixes symmetry but not the triangle inequality, and it stays infinite whenever either support escapes the other.</p>
+
+  <p><b>"Why does it blow up to infinity?"</b> Because <span class="mono">D(p‖q) = ∞</span> whenever there is any <span class="mono">x</span> with <span class="mono">p(x) &gt; 0</span> and <span class="mono">q(x) = 0</span>: the model has declared impossible something that actually happens, and no finite number of bits can encode an event your code has no code word for. In practice this is why models are never allowed to output a hard zero — softmax cannot produce one, and label smoothing, temperature, and additive smoothing all exist partly to keep this term finite. If your KL is <span class="mono">inf</span> or <span class="mono">nan</span>, look for a zero in the denominator distribution before looking anywhere else.</p>
+
+  <p><b>"The video's captions say Kolbach."</b> The spelling is <b>Kullback–Leibler</b>, after Solomon Kullback and Richard Leibler, who introduced it in "On Information and Sufficiency" (1951). The published captions render the surname by ear; the name in the papers is the one to search for.</p>
+
+  <h2 id="further">Going deeper, verified</h2>
+  <ul class="readings">
+    <li><a href="https://doi.org/10.1214/aoms/1177729694" target="_blank" rel="noopener">On Information and Sufficiency</a> — Kullback &amp; Leibler, <i>Annals of Mathematical Statistics</i> 22(1):79–86 (1951) · the original paper; free full text on Project Euclid via the DOI.</li>
+    <li><a href="https://www.inference.org.uk/mackay/itila/book.html" target="_blank" rel="noopener">Information Theory, Inference, and Learning Algorithms</a> — David MacKay (2003) · free PDF; §2.6 introduces relative entropy and proves Gibbs' inequality by exactly the Jensen argument above.</li>
+    <li><a href="https://arxiv.org/abs/1601.00670" target="_blank" rel="noopener">Variational Inference: A Review for Statisticians</a> — Blei, Kucukelbir &amp; McAuliffe (2016) · the cleanest derivation of the ELBO-plus-KL decomposition, and an explicit discussion of why reverse KL under-disperses.</li>
+    <li><a href="https://arxiv.org/abs/1312.6114" target="_blank" rel="noopener">Auto-Encoding Variational Bayes</a> — Kingma &amp; Welling (2013) · where the KL-to-the-prior term in the VAE objective comes from.</li>
+    <li><a href="https://arxiv.org/abs/2203.02155" target="_blank" rel="noopener">Training language models to follow instructions with human feedback</a> — Ouyang et al. (2022) · the InstructGPT paper; its RL objective is the canonical "reward minus <span class="mono">β</span>·KL-to-reference" form.</li>
+  </ul>
+
+  <h2 id="exercises">Exercises</h2>
+  <ol class="exercises">
+    <li><b>Rebuild the robot ledger, then break its symmetry</b> — reproduce <span class="mono">H(p) = H(q) = 1.75</span>, <span class="mono">H(p,q) = 2.625</span> and <span class="mono">D(p‖q) = 0.875</span> bits for the two robot distributions, both by subtraction and by the single-sum form, and confirm the two agree. Then verify the claim in this page that <span class="mono">D(q‖p) = 0.875</span> too, and explain why — a good answer identifies the permutation up↔right, down↔left that carries <span class="mono">q</span> to <span class="mono">p</span> and back. Finally, perturb one probability (say make right 0.55 and left 0.20) and show the two directions now differ.</li>
+    <li><b>Hunt a triangle-inequality violation of your own</b> — over distributions on two outcomes, search for <span class="mono">a, b, c</span> with <span class="mono">D(a‖c) &gt; D(a‖b) + D(b‖c)</span>. A good answer reports a concrete triple and its three numbers (the page's <span class="mono">(0.9,0.1)</span>, <span class="mono">(0.5,0.5)</span>, <span class="mono">(0.1,0.9)</span> gives 2.536 against 1.268), and says <em>why</em> the violation is easy to find: <span class="mono">D(a‖c)</span> grows without bound as <span class="mono">c</span> approaches a boundary of the simplex, while a route through an interior <span class="mono">b</span> keeps every term finite.</li>
+    <li><b>Fit a model in each direction</b> — take the bimodal <span class="mono">p = (0.45, 0.04, 0.02, 0.04, 0.45)</span> from this page and a one-parameter family of unimodal candidates (for instance a discretised Gaussian on bins 1–5, sweeping mean and width on a grid). Find the member minimising <span class="mono">D(p‖q)</span> and the member minimising <span class="mono">D(q‖p)</span>. A good answer shows the two minimisers are different — the forward one wide and centred, the reverse one narrow and parked on a mode — and reports both divergences for both winners so the crossover is visible in numbers rather than assertion.</li>
+  </ol>
+
+  <div class="callout">Previous: <a class="lnk" href="p14.html">P14 Distillation: training on a distribution instead of an answer</a> · Next: <a class="lnk" href="p16.html">P16 Expected information gain: how to choose a guess</a> · Back to the <a class="lnk" href="../index.html#cross-entropy">map</a>.</div>
+</main>
+<footer>Original explanation of 3Blue1Brown's "But what is cross-entropy? | Compression is Intelligence Part 2". The lesson and animations are Grant Sanderson's; this page links to them, it does not copy them.</footer>
+</body>
+</html>
