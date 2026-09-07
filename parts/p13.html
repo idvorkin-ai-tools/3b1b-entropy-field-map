@@ -33,16 +33,14 @@
     <li><a href="https://youtu.be/GlYgs6v2YfU?t=1280" target="_blank" rel="noopener">21:20</a> — Why that answer is unsatisfying: if the formula evaporates, why keep the name?</li>
     <li><a href="https://youtu.be/GlYgs6v2YfU?t=1312" target="_blank" rel="noopener">21:52</a> — Restart with an unknown loss <span class="mono">F</span>: the only obvious constraint is that it decrease.</li>
     <li><a href="https://youtu.be/GlYgs6v2YfU?t=1343" target="_blank" rel="noopener">22:23</a> — “My name is ___”: a context common enough to appear thousands of times.</li>
-    <li><a href="https://youtu.be/GlYgs6v2YfU?t=1373" target="_blank" rel="noopener">22:53</a> — One instance contributes <span class="mono">F(q)</span>; the total is what matters.</li>
     <li><a href="https://youtu.be/GlYgs6v2YfU?t=1406" target="_blank" rel="noopener">23:26</a> — Weighting by <span class="mono">p</span>, the empirical frequency: the sum becomes a weighted average.</li>
     <li><a href="https://youtu.be/GlYgs6v2YfU?t=1436" target="_blank" rel="noopener">23:56</a> — Set <span class="mono">F = −log</span> and the weighted average <em>is</em> the cross-entropy formula.</li>
     <li><a href="https://youtu.be/GlYgs6v2YfU?t=1470" target="_blank" rel="noopener">24:30</a> — The implication run backwards: demand honesty, and <span class="mono">F</span> must be a log.</li>
-    <li><a href="https://youtu.be/GlYgs6v2YfU?t=1502" target="_blank" rel="noopener">25:02</a> — The on-screen details: minimize subject to <span class="mono">Σ q = 1</span>, tangent contours, equal gradients.</li>
-    <li><a href="https://youtu.be/GlYgs6v2YfU?t=1532" target="_blank" rel="noopener">25:32</a> — The condition <span class="mono">F′(q) = c/q</span>, and the conclusion: your hand is forced.</li>
+    <li><a href="https://youtu.be/GlYgs6v2YfU?t=1502" target="_blank" rel="noopener">25:02</a> — The on-screen details: minimize subject to <span class="mono">Σ q = 1</span>, tangent contours, equal gradients — boiling down at <a href="https://youtu.be/GlYgs6v2YfU?t=1532" target="_blank" rel="noopener">25:32</a> to <span class="mono">F′(q) = c/q</span>, so your hand is forced.</li>
     <li><a href="https://youtu.be/GlYgs6v2YfU?t=1562" target="_blank" rel="noopener">26:02</a> — A second footnote on overfitting, and the handoff to distillation.</li>
   </ul>
 
-  <h2 id="onehot">The answer that is correct and useless</h2>
+  <h2 id="onehot">The name that doesn’t fit yet, and the distribution that was hiding</h2>
   <p>Start with the standard explanation, because you will meet it everywhere and you should know exactly what is wrong with it. Fix a position in the training text whose true next token is <span class="mono">t</span>. Define a target distribution <span class="mono">y</span> that is one-hot at <span class="mono">t</span>: <span class="mono">y(t) = 1</span>, <span class="mono">y(x) = 0</span> for every other token. Then write down the cross-entropy of the model's distribution <span class="mono">q</span> relative to that target:</p>
 
 <pre class="code-block">H(y, q)  =  Σ  y(x) · log( 1 / q(x) )
@@ -58,8 +56,7 @@
 
   <p>Two better explanations follow. The first says the second distribution was real, you were just looking at one training example at a time and could not see it. The second says that even if you had never heard of cross-entropy, you would have been forced to invent it.</p>
 
-  <h2 id="grouping">Where the second distribution was hiding</h2>
-  <p>Pick a context that recurs: <span class="mono">"My name is ___"</span>. In a web-scale corpus that prefix appears an enormous number of times, followed by different names in proportion to how common those names are in the data. The model does not get to see a distribution — it sees one name per occurrence. But the <em>loss</em> is a sum over occurrences, and a sum over occurrences of the same context is a weighted average over what followed.</p>
+  <p>Take the first. Pick a context that recurs: <span class="mono">"My name is ___"</span>. In a web-scale corpus that prefix appears an enormous number of times, followed by different names in proportion to how common those names are in the data. The model does not get to see a distribution — it sees one name per occurrence. But the <em>loss</em> is a sum over occurrences, and a sum over occurrences of the same context is a weighted average over what followed.</p>
 
   <p>Write <span class="mono">cᵢ</span> for the context at position <span class="mono">i</span> and <span class="mono">xᵢ</span> for the token that actually followed. Let <span class="mono">p̂(x | c)</span> be the empirical frequency of <span class="mono">x</span> among all the positions sharing context <span class="mono">c</span>, and <span class="mono">N_c</span> the number of those positions. Then the corpus loss regroups exactly:</p>
 
