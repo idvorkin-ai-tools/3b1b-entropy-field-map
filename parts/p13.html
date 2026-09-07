@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>P13 Why this loss and not another one — Entropy, mapped</title>
+<meta name="description" content="Why cross-entropy and no other decreasing loss: the Lagrange argument, strictly proper scoring rules, and the maximum-likelihood restatement." />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="../paper.css" />
+</head>
+<body>
+<header class="bar"><div class="bar-in">
+  <div class="brand"><span class="dot"></span>ENTROPY&nbsp;//&nbsp;FIELD&nbsp;MAP</div>
+  <a class="back" href="../index.html#cross-entropy">← field map</a>
+</div></header>
+<main>
+  <div class="eyebrow"><span class="box bb mono">P13 · CROSS-ENTROPY</span><span class="mono">3Blue1Brown · 20:38–26:13 · 6 min</span></div>
+  <h1>Why this loss and not another one</h1>
+  <div class="authors">Part 2 of the compression series, the chapter titled “What makes this loss function best?” — the optimality argument behind cross-entropy loss.</div>
+  <div class="paperlink" style="border-left-color:var(--def)"><span class="lbl">Watch</span><a href="https://youtu.be/GlYgs6v2YfU?t=1238" target="_blank" rel="noopener">But what is cross-entropy? | Compression is Intelligence Part 2 — 3Blue1Brown, from 20:38 ↗</a></div>
+  <p class="mono" style="font-size:12.5px;color:var(--ink-dim)">Transcript: <a class="lnk" href="../transcripts/part2.html#s-1238">this stretch, timestamped</a></p>
+
+  <div class="tldr"><b>TL;DR —</b> P12 left us with a loss that never mentions cross-entropy: take the negative log of the probability the model gave the token that actually appeared, average over the corpus. So why is it called cross-entropy loss? The cheap answer — “the target is a one-hot distribution and cross-entropy against it collapses to <span class="mono">−log q(t)</span>” — is true and explains nothing. The real answer is a uniqueness theorem. If you insist that the average loss be minimized <em>only</em> when the model's distribution matches the data's, a one-line Lagrange multiplier argument forces <span class="mono">F′(q) = c/q</span>, and only the logarithm has that derivative. Cross-entropy is not one option among many; it is the <em>only</em> local loss that cannot be gamed by hedging or by bluffing. Statisticians already have a name for that property: it is a <em>strictly proper scoring rule</em>.</div>
+
+  <p class="lead">P12 built the pre-training loss from scratch and got to a formula that is embarrassingly simple: average <span class="mono">−log q(true token)</span> over every position in the corpus. Nowhere in that derivation did two distributions appear, and cross-entropy is a two-distribution quantity. This page closes that gap, and it does so twice over — first by showing where the second distribution was hiding all along (it appears the moment you group the corpus by repeated context), then by proving that no other choice of loss would have worked. That second half is where the argument does real work, and it is also where Grant deliberately puts the details on screen rather than narrating them, so this page reconstructs them in full. What follows sets up P14, where the hidden distribution stops being hypothetical and becomes an actual second model.</p>
+
+  <h2 id="outline">Outline, with timestamps</h2>
+  <ul class="outline">
+    <li><a href="https://youtu.be/GlYgs6v2YfU?t=1238" target="_blank" rel="noopener">20:38</a> — The naming puzzle: a loss built from logs, called cross-entropy loss.</li>
+    <li><a href="https://youtu.be/GlYgs6v2YfU?t=1250" target="_blank" rel="noopener">20:50</a> — The one-hot answer: cross-entropy against a spike collapses to a single log term.</li>
+    <li><a href="https://youtu.be/GlYgs6v2YfU?t=1280" target="_blank" rel="noopener">21:20</a> — Why that answer is unsatisfying: if the formula evaporates, why keep the name?</li>
+    <li><a href="https://youtu.be/GlYgs6v2YfU?t=1312" target="_blank" rel="noopener">21:52</a> — Restart with an unknown loss <span class="mono">F</span>: the only obvious constraint is that it decrease.</li>
+    <li><a href="https://youtu.be/GlYgs6v2YfU?t=1343" target="_blank" rel="noopener">22:23</a> — “My name is ___”: a context common enough to appear thousands of times.</li>
+    <li><a href="https://youtu.be/GlYgs6v2YfU?t=1373" target="_blank" rel="noopener">22:53</a> — One instance contributes <span class="mono">F(q)</span>; the total is what matters.</li>
+    <li><a href="https://youtu.be/GlYgs6v2YfU?t=1406" target="_blank" rel="noopener">23:26</a> — Weighting by <span class="mono">p</span>, the empirical frequency: the sum becomes a weighted average.</li>
+    <li><a href="https://youtu.be/GlYgs6v2YfU?t=1436" target="_blank" rel="noopener">23:56</a> — Set <span class="mono">F = −log</span> and the weighted average <em>is</em> the cross-entropy formula.</li>
+    <li><a href="https://youtu.be/GlYgs6v2YfU?t=1470" target="_blank" rel="noopener">24:30</a> — The implication run backwards: demand honesty, and <span class="mono">F</span> must be a log.</li>
+    <li><a href="https://youtu.be/GlYgs6v2YfU?t=1502" target="_blank" rel="noopener">25:02</a> — The on-screen details: minimize subject to <span class="mono">Σ q = 1</span>, tangent contours, equal gradients.</li>
+    <li><a href="https://youtu.be/GlYgs6v2YfU?t=1532" target="_blank" rel="noopener">25:32</a> — The condition <span class="mono">F′(q) = c/q</span>, and the conclusion: your hand is forced.</li>
+    <li><a href="https://youtu.be/GlYgs6v2YfU?t=1562" target="_blank" rel="noopener">26:02</a> — A second footnote on overfitting, and the handoff to distillation.</li>
+  </ul>
+
+  <h2 id="onehot">The answer that is correct and useless</h2>
+  <p>Start with the standard explanation, because you will meet it everywhere and you should know exactly what is wrong with it. Fix a position in the training text whose true next token is <span class="mono">t</span>. Define a target distribution <span class="mono">y</span> that is one-hot at <span class="mono">t</span>: <span class="mono">y(t) = 1</span>, <span class="mono">y(x) = 0</span> for every other token. Then write down the cross-entropy of the model's distribution <span class="mono">q</span> relative to that target:</p>
+
+<pre class="code-block">H(y, q)  =  Σ  y(x) · log( 1 / q(x) )
+            x
+
+         =  1 · log(1/q(t))  +  0 · log(1/q(x₁))  +  0 · log(1/q(x₂))  +  …
+
+         =  −log q(t)</pre>
+
+  <p>Every term but one is annihilated by a zero weight, and what survives is exactly the per-token loss from <a class="lnk" href="p12.html">P12</a>. So the name is <em>defensible</em>. But notice what the derivation costs: you invented a distribution whose only job was to disappear. If the cross-entropy machinery contributes nothing that survives to the final expression, calling the result cross-entropy loss is decoration, not explanation.</p>
+
+  <blockquote class="q"><span>"This does nothing to explain why you're using cross-entropy in the first place, and if it all just evaporates away anyway, why not just be straightforward? Why not just call it log loss, or information loss?"</span><span class="cite">— Grant Sanderson, <a href="https://youtu.be/GlYgs6v2YfU?t=1280" target="_blank" rel="noopener">21:20</a></span></blockquote>
+
+  <p>Two better explanations follow. The first says the second distribution was real, you were just looking at one training example at a time and could not see it. The second says that even if you had never heard of cross-entropy, you would have been forced to invent it.</p>
+
+  <h2 id="grouping">Where the second distribution was hiding</h2>
+  <p>Pick a context that recurs: <span class="mono">"My name is ___"</span>. In a web-scale corpus that prefix appears an enormous number of times, followed by different names in proportion to how common those names are in the data. The model does not get to see a distribution — it sees one name per occurrence. But the <em>loss</em> is a sum over occurrences, and a sum over occurrences of the same context is a weighted average over what followed.</p>
+
+  <p>Write <span class="mono">cᵢ</span> for the context at position <span class="mono">i</span> and <span class="mono">xᵢ</span> for the token that actually followed. Let <span class="mono">p̂(x | c)</span> be the empirical frequency of <span class="mono">x</span> among all the positions sharing context <span class="mono">c</span>, and <span class="mono">N_c</span> the number of those positions. Then the corpus loss regroups exactly:</p>
+
+<pre class="code-block">average loss  =  (1/N) · Σ  −log q(xᵢ | cᵢ)            one term per token position
+                         i
+
+                                                       group positions by their context c
+
+              =  Σ (N_c / N) · Σ  p̂(x | c) · log( 1 / q(x | c) )
+                 c              x
+
+              =  Σ (N_c / N) · H( p̂(·|c) , q(·|c) )
+                 c</pre>
+
+  <p>That is the whole trick, and it is an identity, not an approximation — no distribution was estimated, only bookkeeping was rearranged. The empirical conditional <span class="mono">p̂(·|c)</span> never appears in any line of training code; it exists only in the aggregate, spread across thousands of gradient steps. But it is what the loss is really scoring against. Cross-entropy loss is a cross-entropy — averaged over contexts, weighted by how often each context occurs.</p>
+
+  <p>And now the property from <a class="lnk" href="p08.html">the first half of the video</a> earns its keep. For each context <span class="mono">c</span>, the term <span class="mono">H(p̂(·|c), q(·|c))</span> is minimized precisely when <span class="mono">q(·|c) = p̂(·|c)</span>. Minimizing the total therefore drives the model toward the data's own conditional statistics, context by context. Concretely, with four possible names and their empirical frequencies fixed, here is what four candidate models pay (in bits per token; multiply by <span class="mono">ln 2 ≈ 0.693</span> for nats):</p>
+
+  <table class="kv">
+    <tr><th>model's distribution <span class="mono">q</span> over (Maria, Wei, Ana, Yusuf)</th><th><span class="mono">H(p, q)</span></th><th><span class="mono">D(p‖q)</span></th></tr>
+    <tr><td>truthful — <span class="mono">(½, ¼, ⅛, ⅛)</span>, equal to <span class="mono">p</span></td><td>1.750 bits</td><td>0.000</td></tr>
+    <tr><td>hedged — <span class="mono">(0.40, 0.30, 0.15, 0.15)</span>, flattened toward uniform</td><td>1.779 bits</td><td>0.029</td></tr>
+    <tr><td>uniform — <span class="mono">(0.25, 0.25, 0.25, 0.25)</span>, no opinion at all</td><td>2.000 bits</td><td>0.250</td></tr>
+    <tr><td>bluffing — <span class="mono">(0.90, 0.05, 0.025, 0.025)</span>, right ranking, wrong confidence</td><td>2.487 bits</td><td>0.737</td></tr>
+  </table>
+
+  <p>The row worth staring at is the last one. That model has the ordering of the names <em>exactly right</em> — it would score a perfect 100% on top-1 accuracy against the mode — and it is punished harder than the model with no opinion whatsoever. Overconfidence in the correct direction is worse than agnosticism. Hedging is punished too, only more gently. The truthful report is the unique minimum, and every deviation from it costs, in either direction. Hold that thought; the next section explains why it is a theorem rather than an accident of these four numbers.</p>
+
+  <h2 id="lagrange">The Lagrange argument, run forwards</h2>
+  <p>First the easy direction: verify that <span class="mono">F = −log</span> really does have the honesty property. Fix a distribution <span class="mono">p</span> over outcomes. Among all distributions <span class="mono">q</span> — that is, all non-negative vectors summing to 1 — which one minimizes the expected reported loss <span class="mono">Σ p(x)·log(1/q(x))</span>? The constraint is what makes this interesting: without <span class="mono">Σ q(x) = 1</span> you would just send every <span class="mono">q(x)</span> to infinity. Grant shows this on screen as two contours becoming tangent; the algebra behind that picture is a Lagrange multiplier, using natural logs so the derivative is clean.</p>
+
+<pre class="code-block">minimize   L(q) = Σ p(x) · ln( 1 / q(x) )       subject to   Σ q(x) = 1
+                  x                                          x
+
+Lagrangian:   𝓛(q, λ)  =  Σ p(x) · ln(1/q(x))  +  λ · ( Σ q(x) − 1 )
+                          x                             x
+
+since  d/dq [ −ln q ]  =  −1/q :
+
+        ∂𝓛/∂q(x)  =  − p(x)/q(x)  +  λ  =  0     ⟹     q(x) = p(x) / λ
+
+impose the constraint:
+
+        Σ q(x) = (1/λ) · Σ p(x) = 1/λ = 1     ⟹     λ = 1     ⟹     q(x) = p(x)</pre>
+
+  <p>The multiplier lands on <span class="mono">λ = 1</span>, which is a useful sanity check: it says the marginal cost of the last unit of probability mass is the same everywhere at the optimum. And the stationary point is a genuine minimum rather than a saddle, because the objective is strictly convex in <span class="mono">q</span> — the Hessian is diagonal with entries <span class="mono">∂²L/∂q(x)² = p(x)/q(x)² &gt; 0</span> for every outcome with <span class="mono">p(x) &gt; 0</span>, and the feasible set (the probability simplex) is convex. A strictly convex function on a convex set has at most one minimizer, so <span class="mono">q = p</span> is not just <em>a</em> minimum, it is <em>the</em> minimum. <em>(That convexity check is my addition; the video asserts uniqueness from the graph.)</em></p>
+
+  <div class="callout"><b>Carry this away.</b> The non-negativity constraints <span class="mono">q(x) ≥ 0</span> never become active, so no KKT machinery is needed — the loss <span class="mono">ln(1/q)</span> blows up to <span class="mono">+∞</span> as <span class="mono">q → 0</span>, which fences the optimizer away from the boundary of the simplex all on its own. This is the same fact that, in practice, makes a single zero-probability assignment to a token that actually occurs an infinite loss, and it is why every real implementation works in log-space with a fused log-softmax rather than computing softmax then taking a log.</div>
+
+  <h2 id="converse">The Lagrange argument, run backwards — the part that matters</h2>
+  <p>Now the direction that does the real work, and the one Grant flashes on screen for the curious. Suppose you knew nothing about logs. You have some decreasing per-token loss <span class="mono">F</span>, and you make one demand: for <em>every</em> possible data distribution <span class="mono">p</span>, the expected loss <span class="mono">Σ p(x)·F(q(x))</span> should be minimized at <span class="mono">q = p</span> and nowhere else. What functions <span class="mono">F</span> survive?</p>
+
+<pre class="code-block">stationarity for a generic F:   p(x) · F′(q(x))  +  λ  =  0        for every x
+
+so at the optimum,  p(x) · F′(q(x))  =  −λ,  the SAME number for every x.
+
+demand the optimum be q = p:    p(x) · F′(p(x))  =  −λ(p)          for every x
+
+write  φ(t) = t · F′(t).  The demand says: φ takes the same value on every
+entry of p — and this must hold for EVERY distribution p.
+
+pick any u, v in (0,1).  Let w = ½ · min(1−u, 1−v),  so w &gt; 0 and u+w &lt; 1, v+w &lt; 1.
+
+   (u, w, 1−u−w)  is a valid distribution   ⟹   φ(u) = φ(w)
+   (v, w, 1−v−w)  is a valid distribution   ⟹   φ(v) = φ(w)
+
+hence φ(u) = φ(v) for all u, v:  φ ≡ c, a constant.
+
+   t · F′(t) = c    ⟹    F′(t) = c / t    ⟹    F(t) = c · ln t + d
+
+F decreasing forces c &lt; 0.  Taking c = −1, d = 0:      F(t) = −ln t</pre>
+
+  <p>Read the last two lines slowly, because they are the whole point of the chapter. The condition <span class="mono">F′(t) = c/t</span> is Grant's “some constant over q,” and the functions whose derivative is a constant over the variable are exactly the logarithms, up to an additive constant. So the surviving family is <span class="mono">F(t) = a·(−ln t) + b</span> with <span class="mono">a &gt; 0</span> — the negative log, rescaled and shifted. A positive rescaling is absorbed into the learning rate (which is exactly why base-2 versus base-e does not matter, as noted at <a href="https://youtu.be/GlYgs6v2YfU?t=1153" target="_blank" rel="noopener">19:13</a>), and an additive constant has zero gradient. Every member of the family is the same loss wearing different units.</p>
+
+  <blockquote class="q"><span>"…if you want a loss function with the property that it's minimized only when the model matches the statistics of the data, your hand is forced. You actually have to use the negative log."</span><span class="cite">— Grant Sanderson, <a href="https://youtu.be/GlYgs6v2YfU?t=1532" target="_blank" rel="noopener">25:32</a></span></blockquote>
+
+  <p><em>My addition, and a caveat worth knowing:</em> the step where I built three-outcome distributions is not decorative. On a sample space with only two outcomes the same argument yields only <span class="mono">φ(t) = φ(1−t)</span>, which is far weaker than constancy, and the logarithm is genuinely <em>not</em> the unique answer there. The uniqueness theorem needs at least three possible outcomes. For a language model with a vocabulary in the tens of thousands this is not a constraint anyone notices, but it is the reason the corresponding result is usually stated for categorical variables with <span class="mono">n ≥ 3</span>.</p>
+
+  <h2 id="proper">The name for this property: a strictly proper scoring rule</h2>
+  <p>What has actually been proved is a statement from decision theory that predates deep learning by decades. Score a forecaster by <span class="mono">S(q, x)</span> — the penalty they pay for having reported distribution <span class="mono">q</span> when outcome <span class="mono">x</span> occurred. The rule is <b>proper</b> if reporting your true beliefs is among the expected-loss-minimizing reports, and <b>strictly proper</b> if it is the <em>only</em> one. Cross-entropy — under this name, the <b>logarithmic score</b> — is strictly proper. So is the <b>Brier score</b>, the other famous member of the family. The linear score <span class="mono">S(q, x) = −q(x)</span> is not proper at all.</p>
+
+  <p>Strict propriety has a clean information-theoretic reading that ties this page back to the first half of the video. Split the expected loss:</p>
+
+<pre class="code-block">H(p, q)  =  Σ p(x) · log( 1 / q(x) )
+            x
+
+         =  Σ p(x) · log( 1 / p(x) )   +   Σ p(x) · log( p(x) / q(x) )
+            x                              x
+
+         =           H(p)              +          D(p ‖ q)</pre>
+
+  <p>The first term is the entropy of the data — irreducible, independent of the model, the floor that <a class="lnk" href="p12.html">P12</a> described as “the entropy of language.” The second is the Kullback–Leibler divergence, and Gibbs' inequality says <span class="mono">D(p‖q) ≥ 0</span> with equality if and only if <span class="mono">p = q</span>. So the <em>regret</em> for reporting anything other than your true beliefs is exactly the KL divergence between the truth and your report. Strict propriety and Gibbs' inequality are the same statement in two vocabularies, and the <span class="mono">D(p‖q)</span> column in the names table above is literally the price of dishonesty in bits. (The video returns to KL as its closing footnote, at <a href="https://youtu.be/GlYgs6v2YfU?t=1895" target="_blank" rel="noopener">31:35</a>.)</p>
+
+  <h2 id="alternatives">Why the obvious alternatives lose</h2>
+  <p><b>Accuracy is not strictly proper.</b> Score a model by whether its <span class="mono">argmax</span> matched the true token, and the expected score is <span class="mono">p(argmax q)</span> — maximized by <em>any</em> distribution whose mode is the data's mode. The truthful report is among the winners, so accuracy is weakly proper, but so is a model that reports 99.9% confidence on the mode and rounding error everywhere else. Accuracy cannot tell those apart. It is also piecewise constant, hence has zero gradient almost everywhere, which disqualifies it as a training objective before the propriety argument even starts.</p>
+
+  <p><b>A rule that rewards confidence rewards lying.</b> Take the linear score, paying the model <span class="mono">q(x)</span> when <span class="mono">x</span> occurs. Expected payoff is <span class="mono">Σ p(x)·q(x)</span>, which is <em>linear</em> in <span class="mono">q</span> — and a linear functional over a simplex is maximized at a vertex. For <span class="mono">p = (0.6, 0.4)</span>, honest reporting pays <span class="mono">0.6² + 0.4² = 0.52</span>, while claiming certainty pays <span class="mono">0.6</span>. The rule pays a premium for bluffing. This is not a subtle failure mode; it is the generic behavior of any score linear in the report.</p>
+
+  <p><b>Squared error is proper but trains badly.</b> The Brier score <span class="mono">Σₓ (q(x) − y(x))²</span> against a one-hot target <em>is</em> strictly proper — it is not disqualified on honesty grounds. It is disqualified on gradients. Differentiate both losses with respect to the pre-softmax logits <span class="mono">z</span>, where <span class="mono">q = softmax(z)</span>, in the situation that matters most (confident and wrong: probability <span class="mono">q_t</span> on the true token, essentially all remaining mass on one wrong token):</p>
+
+<pre class="code-block">cross-entropy:   ∂L/∂z_j  =  q_j − y_j        so  |∂L/∂z_t|  =  1 − q_t   →  1
+
+Brier:           ∂L/∂z_t  =  −4 · q_t · (1 − q_t)²                        →  0</pre>
+
+  <table class="kv">
+    <tr><th>probability on the true token</th><th>cross-entropy loss (nats)</th><th>Brier loss</th><th><span class="mono">|∂L/∂z_t|</span>, cross-entropy</th><th><span class="mono">|∂L/∂z_t|</span>, Brier</th></tr>
+    <tr><td><span class="mono">0.5</span></td><td>0.693</td><td>0.500</td><td>0.500</td><td>0.500</td></tr>
+    <tr><td><span class="mono">0.1</span></td><td>2.303</td><td>1.620</td><td>0.900</td><td>0.324</td></tr>
+    <tr><td><span class="mono">0.01</span></td><td>4.605</td><td>1.960</td><td>0.990</td><td>0.0392</td></tr>
+    <tr><td><span class="mono">0.001</span></td><td>6.908</td><td>1.996</td><td>0.999</td><td>0.00399</td></tr>
+  </table>
+
+  <p>The two agree at <span class="mono">q_t = ½</span> and then diverge violently. Cross-entropy's loss is unbounded and its gradient <em>strengthens</em> toward the maximum as the model gets more confidently wrong; the softmax factor that would damp it cancels exactly against the <span class="mono">1/q</span> from the log. Brier's loss is bounded above by 2 no matter how wrong the model is, and its gradient collapses like <span class="mono">4·q_t</span> — at <span class="mono">q_t = 0.001</span> it is 250× weaker than cross-entropy's. A confidently-wrong model under Brier is nearly a fixed point. That is the practical difference, and it has nothing to do with propriety: both losses are honest at the optimum, but only one of them can find its way there from a bad initialization.</p>
+
+  <h2 id="mle">The same statement in likelihood language</h2>
+  <p>Everything above can be said without mentioning entropy at all, in the vocabulary most readers already have. Because a language model factors the probability of a document by the chain rule, the sum of per-token log-probabilities <em>is</em> the log-probability of the document:</p>
+
+<pre class="code-block">ln P(x₁ … x_N | θ)  =  Σ  ln q_θ(xᵢ | x₁ … xᵢ₋₁)
+                        i
+
+so the training loss  =  −(1/N) · ln P(corpus | θ)  =  −(1/N) · log-likelihood</pre>
+
+  <p>Minimizing average cross-entropy on one-hot targets is <em>exactly</em> maximum likelihood estimation on the corpus. The two are the same objective up to the factor <span class="mono">1/N</span>. Equivalently, since <span class="mono">H(p̂, q) = H(p̂) + D(p̂‖q)</span> and <span class="mono">H(p̂)</span> does not depend on the parameters, MLE is minimizing <span class="mono">D(p̂ ‖ q_θ)</span> — the KL divergence from the empirical distribution to the model. The three framings (average information per token, maximum likelihood, minimum KL to the data) are one objective seen from three directions, which is precisely why the same formula keeps turning up in unrelated corners of the literature.</p>
+
+  <p>One practical consequence: <b>perplexity</b>, the number quoted in every language-model paper, is just this loss exponentiated. <span class="mono">perplexity = exp(mean cross-entropy in nats) = 2^(mean cross-entropy in bits)</span>. A perplexity of 12 means the model is, on average, as uncertain as if it were choosing uniformly among 12 tokens — and the bits-per-token reading is the direct bridge to the compression story the series picks up next.</p>
+
+  <h2 id="calibration">What propriety does and does not buy you</h2>
+  <p>Strict propriety is a statement about the <em>global</em> minimum of the expected loss over <em>all</em> distributions. It says: if your model could represent any distribution, and you found the true optimum, and you had infinite data, then the loss-minimizing model is the perfectly calibrated one. Every one of those three conditions fails in practice. Real networks have finite capacity, are trained by a stochastic optimizer that stops early, and see a finite corpus — and trained deep networks are in fact reliably <em>overconfident</em> relative to their accuracy, which is why post-hoc temperature scaling is a standard fix. Propriety guarantees that the loss is not <em>pushing</em> the model toward dishonesty; it guarantees nothing about where the model actually lands.</p>
+
+  <p>That gap is also, quietly, the subject of Grant's second on-screen footnote at <a href="https://youtu.be/GlYgs6v2YfU?t=1562" target="_blank" rel="noopener">26:02</a> about overfitting: the empirical conditional <span class="mono">p̂(·|c)</span> that the grouping argument leans on only exists for contexts that recur, and the overwhelming majority of contexts in a large corpus are seen exactly once. The honest version of the argument is that the loss is a cross-entropy against a distribution the model must <em>generalize</em> its way to, not one it can ever observe. Which is exactly the pressure P14 relieves: replace the sparse empirical target with a dense one supplied by a bigger model, and every single example carries a full distribution's worth of signal.</p>
+
+  <h2 id="stuck">Where people get stuck</h2>
+  <p><b>“But there is only one distribution in the code.”</b> Correct, and this is the single most common source of confusion about the name. Open any training loop and you will find <span class="mono">loss = −logsoftmax(logits)[target]</span>, one distribution and one integer index. The second distribution is not materialized anywhere; it exists only after you sum over many positions that share a context, and it is <em>empirical</em> — defined by the corpus's own frequencies. Cross-entropy loss is a cross-entropy in expectation, not per example.</p>
+
+  <p><b>Which distribution goes in which slot.</b> In <span class="mono">H(p, q) = Σ p(x)·log(1/q(x))</span>, the <em>first</em> argument supplies the weights (reality, the data) and the <em>second</em> supplies the code lengths (the model, the thing you optimize). The video's phrasing is “the cross-entropy of <span class="mono">q</span> relative to <span class="mono">p</span>” for exactly this expression — the code came from <span class="mono">q</span>, the world is <span class="mono">p</span>. Notation in the wild is genuinely inconsistent, so the safe habit is to check which argument the sum is weighted by rather than trusting the argument order. The quantity is asymmetric: swapping the roles gives a different number, as the 90/10 versus 50/50 example at <a href="https://youtu.be/GlYgs6v2YfU?t=562" target="_blank" rel="noopener">09:22</a> shows.</p>
+
+  <p><b>The sign in the Lagrangian.</b> Written as <span class="mono">Σ p·ln(1/q) + λ(Σ q − 1)</span>, the derivative of the first term with respect to <span class="mono">q(x)</span> is <span class="mono">−p(x)/q(x)</span> — negative, because pushing more probability onto any outcome always <em>lowers</em> the loss. The multiplier is what pushes back, and it must therefore come out positive; getting <span class="mono">λ = 1</span> rather than <span class="mono">λ = −1</span> is a cheap check that you differentiated correctly. If you write the objective as <span class="mono">−Σ p·ln q</span> instead, the same derivative appears with the same sign; the two forms are identical, not merely similar.</p>
+
+  <p><b>“Strictly proper” does not mean “best.”</b> The Brier score is strictly proper too. Propriety is a necessary condition for a sane probabilistic loss, not a sufficient one — it rules out losses that reward lying, and says nothing about optimization dynamics, numerical stability, or robustness to label noise. The uniqueness theorem in this chapter is stronger than propriety alone: it says the log score is the only <em>local</em> strictly proper rule, where local means the score depends only on the probability assigned to the outcome that actually happened. Brier is strictly proper but not local — it looks at the probabilities assigned to outcomes that did not occur. If you want a loss that reads off a single number from the model's output, you get the logarithm and nothing else.</p>
+
+  <h2 id="further">Going deeper, verified</h2>
+  <ul class="readings">
+    <li><a href="https://www.khanacademy.org/math/multivariable-calculus/applications-of-multivariable-derivatives/lagrange-multipliers-and-constrained-optimization/v/constrained-optimization-introduction" target="_blank" rel="noopener">Lagrange multipliers and constrained optimization</a> — Grant Sanderson, Khan Academy · The exact link from this video's description; the tangent-contours picture the derivation above turns into algebra.</li>
+    <li><a href="https://sites.stat.washington.edu/raftery/Research/PDF/Gneiting2007jasa.pdf" target="_blank" rel="noopener">Strictly Proper Scoring Rules, Prediction, and Estimation</a> — Tilmann Gneiting and Adrian E. Raftery (2007), <em>JASA</em> 102(477) · The canonical survey; the logarithmic, quadratic (Brier) and spherical scores, and the Savage representation linking propriety to convexity.</li>
+    <li><a href="https://doi.org/10.1214/aos/1176344689" target="_blank" rel="noopener">Expected Information as Expected Utility</a> — José M. Bernardo (1979), <em>Annals of Statistics</em> 7(3) · The characterization result: the logarithmic score is essentially the only local proper scoring rule, which is the theorem this chapter derives by hand.</li>
+    <li><a href="https://journals.ametsoc.org/view/journals/mwre/78/1/1520-0493_1950_078_0001_vofeit_2_0_co_2.xml" target="_blank" rel="noopener">Verification of Forecasts Expressed in Terms of Probability</a> — Glenn W. Brier (1950), <em>Monthly Weather Review</em> 78(1) · Three pages that introduced the other famous strictly proper rule, from meteorology rather than information theory.</li>
+    <li><a href="https://arxiv.org/abs/1706.04599" target="_blank" rel="noopener">On Calibration of Modern Neural Networks</a> — Guo, Pleiss, Sun and Weinberger (2017) · The empirical counterweight: a strictly proper loss does not produce a calibrated network, and temperature scaling as the standard repair.</li>
+  </ul>
+
+  <h2 id="exercises">Exercises</h2>
+  <ol class="exercises">
+    <li><b>Reproduce the names table, then break it.</b> With <span class="mono">p = (½, ¼, ⅛, ⅛)</span>, compute <span class="mono">H(p, q)</span> in bits for the four models in the table and confirm all four numbers to three decimals, plus <span class="mono">H(p) = 1.75</span>. Then add a fifth model that assigns probability 0 to Yusuf and renormalizes the rest. A good answer reports <span class="mono">H(p, q) = ∞</span>, explains that the culprit is a single term <span class="mono">0.125 · log(1/0) </span>, and connects it to why implementations clamp probabilities or work in log-space throughout.</li>
+    <li><b>Find the stationary point numerically and read off the multiplier.</b> For the same <span class="mono">p</span>, minimize <span class="mono">Σ p(x)·ln(1/q(x))</span> over the simplex by projected gradient descent (or by parameterizing <span class="mono">q = softmax(z)</span> and doing unconstrained descent on <span class="mono">z</span>). A good answer converges to <span class="mono">q = p</span> to several decimals, reports the minimum as <span class="mono">H(p) = 1.75 · ln 2 = 1.213</span> nats, and verifies that <span class="mono">p(x)/q(x) = 1</span> for every <span class="mono">x</span> at convergence — the numerical fingerprint of <span class="mono">λ = 1</span>.</li>
+    <li><b>Demonstrate impropriety, then repair it.</b> Take <span class="mono">p = (0.6, 0.4)</span>. Under the linear score <span class="mono">S(q, x) = q(x)</span>, compute the expected payoff for the honest report and for the certain report <span class="mono">(1, 0)</span>; confirm 0.52 versus 0.60, so lying wins. Now score the same two reports with the log score and confirm the ranking flips: <span class="mono">0.6·ln(1/0.6) + 0.4·ln(1/0.4) = 0.673</span> nats for the honest report, versus <span class="mono">∞</span> for the certain one. Extra credit: sweep <span class="mono">q₁</span> from 0 to 1 and plot both scores, so you can see the linear one sloping monotonically to the vertex while the log one bottoms out at <span class="mono">q₁ = 0.6</span>.</li>
+  </ol>
+
+  <div class="callout">Previous: <a class="lnk" href="p12.html">P12 Pre-training LLMs: the loss function, decoded</a> · Next: <a class="lnk" href="p14.html">P14 Distillation: training on a distribution instead of an answer</a> · Back to the <a class="lnk" href="../index.html#cross-entropy">map</a>.</div>
+</main>
+<footer>Original explanation of 3Blue1Brown's “But what is cross-entropy? | Compression is Intelligence Part 2”. The lesson and animations are Grant Sanderson's; this page links to them, it does not copy them.</footer>
+</body>
+</html>
