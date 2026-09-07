@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Concept index — Entropy, mapped</title>
+<meta name="description" content="Every term in 3Blue1Brown's entropy and cross-entropy series, defined in one place: surprise, entropy, cross-entropy, KL divergence, perplexity, prefix codes, proper scoring rules and the rest." />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="paper.css" />
+</head>
+<body>
+<header class="bar"><div class="bar-in">
+  <div class="brand"><span class="dot"></span>ENTROPY&nbsp;//&nbsp;FIELD&nbsp;MAP</div>
+  <a class="back" href="index.html">← field map</a>
+</div></header>
+<main>
+  <div class="eyebrow"><span class="box wb mono">CONCEPT INDEX</span><span class="mono">every term, one place</span></div>
+  <h1>Concept index</h1>
+  <div class="authors">The vocabulary of the series, defined tightly, each pointing at the page that earns it</div>
+
+  <div class="tldr"><b>How to use this —</b> the pages tell the story in order; this page is for when you already know the story and need the definition. Everything is in bits (base-2 logarithms) unless said otherwise. Throughout, <span class="mono">p</span> is the distribution reality draws from and <span class="mono">q</span> is the distribution your model asserts — keeping those two straight is most of the subject.</div>
+
+  <h2 id="core">The five that matter</h2>
+  <table class="kv">
+    <tr><th>Term</th><th>Definition</th><th>Reads as</th><th>Page</th></tr>
+    <tr>
+      <td><b>Information content</b><br /><span class="mono">surprisal</span></td>
+      <td><span class="mono">I(x) = log₂(1/p(x)) = −log₂ p(x)</span></td>
+      <td>How surprised you should be by one outcome, in bits. Also the length of the code word an optimal encoder would spend on it.</td>
+      <td><a class="lnk" href="parts/p04.html">P4</a></td>
+    </tr>
+    <tr>
+      <td><b>Entropy</b><br /><span class="mono">H(p)</span></td>
+      <td><span class="mono">H(p) = Σ p(x)·log₂(1/p(x))</span></td>
+      <td>Average surprise. The floor on bits per symbol that no encoder can beat, and the yardstick for every compressor.</td>
+      <td><a class="lnk" href="parts/p06.html">P6</a></td>
+    </tr>
+    <tr>
+      <td><b>Cross-entropy</b><br /><span class="mono">H(p, q)</span></td>
+      <td><span class="mono">H(p, q) = Σ p(x)·log₂(1/q(x))</span></td>
+      <td>What you actually pay: <span class="mono">q</span>'s prices at <span class="mono">p</span>'s frequencies. Always at least <span class="mono">H(p)</span>, equal only when <span class="mono">q = p</span>.</td>
+      <td><a class="lnk" href="parts/p09.html">P9</a>&nbsp;· <a class="lnk" href="parts/p10.html">P10</a></td>
+    </tr>
+    <tr>
+      <td><b>KL divergence</b><br /><span class="mono">D(p‖q)</span></td>
+      <td><span class="mono">D(p‖q) = H(p, q) − H(p) = Σ p(x)·log₂(p(x)/q(x))</span></td>
+      <td>The surcharge for being wrong — the bits you paid over the unavoidable minimum. Non-negative, zero only at <span class="mono">q = p</span>, asymmetric.</td>
+      <td><a class="lnk" href="parts/p15.html">P15</a></td>
+    </tr>
+    <tr>
+      <td><b>Perplexity</b></td>
+      <td><span class="mono">PP = 2^H</span> (or <span class="mono">e^H</span> if <span class="mono">H</span> is in nats)</td>
+      <td>Entropy exponentiated back into "number of options". A perplexity of 20 means the model is as uncertain as someone choosing uniformly among 20 things.</td>
+      <td><a class="lnk" href="parts/p12.html">P12</a></td>
+    </tr>
+  </table>
+
+  <div class="callout">The one identity to carry: <span class="mono">cross-entropy = entropy + KL</span>. The first term is the cost reality imposes and no model can remove; the second is the cost your model adds. Training can only ever attack the second, which is why minimising cross-entropy and minimising KL are the same optimisation.</div>
+
+  <h2 id="coding">Coding and compression</h2>
+  <ul class="readings">
+    <li><b>Code word</b> — the bit string standing in for one symbol. <a class="lnk" href="parts/p02.html">P2</a></li>
+    <li><b>Prefix-free code</b> (also <i>instantaneous</i> or <i>prefix</i> code) — no code word is a prefix of another, so the receiver knows where each one ends without separators. Equivalently, the code words are the leaves of a binary tree. <a class="lnk" href="parts/p02.html">P2</a></li>
+    <li><b>Kraft's inequality</b> — a prefix-free code with lengths <span class="mono">l₁, l₂, …</span> exists if and only if <span class="mono">Σ 2^(−lᵢ) ≤ 1</span>. This is the budget that makes code length a zero-sum game: shortening one word forces another to lengthen. <a class="lnk" href="parts/p02.html">P2</a>&nbsp;· <a class="lnk" href="parts/p08.html">P8</a></li>
+    <li><b>Source coding theorem</b> (Shannon's noiseless coding theorem) — the average length <span class="mono">L</span> of any uniquely decodable code satisfies <span class="mono">L ≥ H(p)</span>, and a code exists with <span class="mono">L &lt; H(p) + 1</span>. Coding blocks of symbols pushes the gap towards zero. <a class="lnk" href="parts/p06.html">P6</a></li>
+    <li><b>Huffman coding</b> — the algorithm that builds the optimal per-symbol prefix code for a known distribution. Optimal among <i>integer-length</i> codes, which is why it can still sit above the entropy floor. <a class="lnk" href="parts/p02.html">P2</a></li>
+    <li><b>Arithmetic coding</b> — encodes a whole message as a single number in an interval, so it spends effectively fractional bits per symbol and reaches the entropy floor in the limit. This is the machinery that turns any probabilistic model, a language model included, into a compressor. <a class="lnk" href="parts/p03.html">P3</a>&nbsp;· <a class="lnk" href="parts/p01.html">P1</a></li>
+    <li><b>Bits per character / bits per byte</b> — cross-entropy per unit of raw text, the unit in which compressors and language models can be compared on the same axis. <a class="lnk" href="parts/p05.html">P5</a>&nbsp;· <a class="lnk" href="parts/p12.html">P12</a></li>
+    <li><b>Nats</b> — the same quantities with natural logs instead of base 2. Deep-learning frameworks report nats; divide by <span class="mono">ln 2 ≈ 0.6931</span> to get bits. <a class="lnk" href="parts/p12.html">P12</a></li>
+  </ul>
+
+  <h2 id="learning">Where it lands in machine learning</h2>
+  <ul class="readings">
+    <li><b>Cross-entropy loss</b> — with a one-hot target the sum collapses to <span class="mono">−log q(correct token)</span>. That is the entire pre-training objective, and it is measured in bits (or nats) per token, which is to say in compressed file size. <a class="lnk" href="parts/p12.html">P12</a></li>
+    <li><b>Softmax</b> — the map from raw model outputs (logits) to a probability distribution <span class="mono">q</span>, so that there is something for cross-entropy to score. <a class="lnk" href="parts/p12.html">P12</a></li>
+    <li><b>Proper scoring rule</b> — a loss whose expected value is optimised by reporting your true beliefs. <i>Strictly</i> proper means uniquely so. Cross-entropy (the log score) is strictly proper, which is the formal reason it cannot be gamed by bluffing or hedging. <a class="lnk" href="parts/p13.html">P13</a></li>
+    <li><b>Maximum likelihood</b> — minimising cross-entropy against observed one-hot outcomes is exactly maximum likelihood estimation. Two vocabularies, one procedure. <a class="lnk" href="parts/p13.html">P13</a></li>
+    <li><b>Distillation</b> — replace the one-hot target with a teacher model's full distribution, so every vocabulary entry contributes to the sum and the student inherits the teacher's shape of uncertainty, not just its top answer. <a class="lnk" href="parts/p14.html">P14</a></li>
+    <li><b>Forward vs. reverse KL</b> — <span class="mono">D(p‖q)</span> punishes a model for assigning near-zero probability to things that happen, so it spreads out to cover every mode; <span class="mono">D(q‖p)</span> lets a model ignore modes, so it collapses onto one. Which direction you minimise decides which failure you get. <a class="lnk" href="parts/p15.html">P15</a></li>
+    <li><b>Expected information gain</b> — the entropy of the distribution over outcomes an action could produce; the score that picks a Wordle guess, and the same quantity that drives active learning and optimal experiment design. <a class="lnk" href="parts/p16.html">P16</a></li>
+  </ul>
+
+  <h2 id="channel">The other side of the channel</h2>
+  <ul class="readings">
+    <li><b>Parity bit</b> — one bit recording whether the number of ones in a group is even or odd. Detects a single flip; cannot locate it. <a class="lnk" href="parts/p19.html">P19</a></li>
+    <li><b>Hamming code</b> — overlapping parity groups arranged so that the set of failing checks spells the binary index of the flipped bit. The (15,11) code carries 11 message bits in 15. <a class="lnk" href="parts/p19.html">P19</a></li>
+    <li><b>SECDED</b> — single error correction, double error detection: one extra whole-block parity bit upgrades the (15,11) code to (16,11) and lets it tell one flip from two. <a class="lnk" href="parts/p19.html">P19</a></li>
+    <li><b>Syndrome</b> — the pattern of failing parity checks, read as a number. In the one-line implementation it is just the XOR of the indices of every bit that is on. <a class="lnk" href="parts/p20.html">P20</a></li>
+    <li><b>Noisy-channel coding theorem</b> — Shannon's other 1948 result: every noisy channel has a capacity, and below it arbitrarily reliable transmission is possible. Compression removes redundancy; error correction adds a measured amount back. <a class="lnk" href="parts/p19.html">P19</a></li>
+  </ul>
+
+  <h2 id="people">Names and papers</h2>
+  <ul class="readings">
+    <li><a href="https://people.math.harvard.edu/~ctm/home/text/others/shannon/entropy/entropy.pdf" target="_blank" rel="noopener">A Mathematical Theory of Communication</a> — Claude Shannon (1948). Entropy, the source coding theorem and the noisy-channel coding theorem, all in one paper. The series is a rebuild of its first half.</li>
+    <li><a href="https://www.princeton.edu/~wbialek/rome/refs/shannon_51.pdf" target="_blank" rel="noopener">Prediction and Entropy of Printed English</a> — Claude Shannon (1951). The guessing-game measurement of English, and the first clear statement that a language's entropy is only defined relative to a predictor.</li>
+    <li><a href="https://colah.github.io/posts/2015-09-Visual-Information/" target="_blank" rel="noopener">Visual Information Theory</a> — Chris Olah (2015). The visual treatment Grant credits in the description of Part 1; the best companion reading for <a class="lnk" href="parts/p09.html">P9</a> and <a class="lnk" href="parts/p10.html">P10</a>.</li>
+    <li><a href="https://arxiv.org/abs/1503.02531" target="_blank" rel="noopener">Distilling the Knowledge in a Neural Network</a> — Hinton, Vinyals and Dean (2015). The origin of the soft-target trick in <a class="lnk" href="parts/p14.html">P14</a>.</li>
+    <li><b>Richard Hamming</b> — Bell Labs, late 1940s. The error-correcting codes of <a class="lnk" href="parts/p19.html">P19</a> and <a class="lnk" href="parts/p20.html">P20</a>.</li>
+    <li><b>Solomon Kullback and Richard Leibler</b> — the 1951 paper that names the divergence in <a class="lnk" href="parts/p15.html">P15</a>.</li>
+  </ul>
+
+  <div class="callout">Back to the <a class="lnk" href="index.html">field map</a>, or start at <a class="lnk" href="parts/p01.html">P1</a>.</div>
+</main>
+<footer>A glossary for 3Blue1Brown's entropy and cross-entropy videos. The lessons are Grant Sanderson's; these definitions are this map's own words.</footer>
+</body>
+</html>

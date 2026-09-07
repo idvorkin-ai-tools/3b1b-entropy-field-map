@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>P09 Defining cross-entropy — Entropy, mapped</title>
+<meta name="description" content="H(p,q) = Σ p(x)·log₂(1/q(x)): q is the model that set the code lengths, p is the reality that sets the weights." />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="../paper.css" />
+</head>
+<body>
+<header class="bar"><div class="bar-in">
+  <div class="brand"><span class="dot"></span>ENTROPY&nbsp;//&nbsp;FIELD&nbsp;MAP</div>
+  <a class="back" href="../index.html#cross-entropy">← field map</a>
+</div></header>
+<main>
+  <div class="eyebrow"><span class="box bb mono">P09 · CROSS-ENTROPY</span><span class="mono">3Blue1Brown · 05:20–08:26 · 3 min</span></div>
+  <h1>Defining cross-entropy</h1>
+  <div class="authors">Part 2, <i>But what is cross-entropy?</i> — the chapter titled "Defining cross-entropy", where the robot's distribution changes but its codebook does not.</div>
+  <div class="paperlink" style="border-left-color:var(--def)"><span class="lbl">Watch</span><a href="https://youtu.be/GlYgs6v2YfU?t=320" target="_blank" rel="noopener">But what is cross-entropy? | Compression is Intelligence Part 2 — 3Blue1Brown, from 05:20 ↗</a></div>
+  <p class="mono" style="font-size:12.5px;color:var(--ink-dim)">Transcript: <a class="lnk" href="../transcripts/part2.html#s-320">this stretch, timestamped</a></p>
+
+  <div class="tldr"><b>TL;DR —</b> One question: if you built a code around a distribution <span class="mono">q</span> and then the symbols start arriving from a different distribution <span class="mono">p</span>, what is your new average cost per symbol? The answer is the definition: <span class="mono">H(p, q) = Σ p(x)·log₂(1/q(x))</span> — you pay <b>q's prices at p's frequencies</b>. <span class="mono">q</span> is the model, and it lives inside the logarithm because it fixed the code lengths; <span class="mono">p</span> is reality, and it lives outside as the weight because it fixes how often each price is charged. Getting those two slots the right way round is the entire skill this page teaches; everything else — <span class="mono">H(p, p) = H(p)</span>, the infinite penalty when <span class="mono">q(x) = 0</span>, the mess of library conventions — falls out of it.</div>
+
+  <p class="lead">P08 closed the loop on optimal codes: given a distribution, the best achievable cost per symbol is its entropy, and the way you achieve it is to spend <span class="mono">log₂(1/p(x))</span> bits on symbol <span class="mono">x</span>. That is a statement about a <em>matched</em> pair — one distribution, one code built for it. Every interesting engineering situation is a <em>mismatched</em> pair: you compress with a model of English and get handed Portuguese, you train a network on one distribution and deploy it on another, you gzip a file with a dictionary learned from the first half. This page takes that mismatch and turns it into a number. It is the definitional page of the arc, so it is deliberately careful rather than intuitive — P10 does the intuition, the 90/10 examples, and the asymmetry.</p>
+
+  <h2 id="outline">Outline, with timestamps</h2>
+  <ul class="outline">
+    <li><a href="https://youtu.be/GlYgs6v2YfU?t=320" target="_blank" rel="noopener">05:20</a> — <b>The plan changes</b>: the space agency rotates the robot's walk, so up and down become 1-in-8, left 1-in-4, right one-half — but the encoder is hard-coded.</li>
+    <li><a href="https://youtu.be/GlYgs6v2YfU?t=341" target="_blank" rel="noopener">05:41</a> — <b>Counting the damage</b>: the old codeword lengths, re-weighted by the new frequencies, come to 2.625 bits per instruction.</li>
+    <li><a href="https://youtu.be/GlYgs6v2YfU?t=373" target="_blank" rel="noopener">06:13</a> — <b>Naming it</b>: that number is the cross-entropy — "you optimised for one context; how does it do in another?"</li>
+    <li><a href="https://youtu.be/GlYgs6v2YfU?t=404" target="_blank" rel="noopener">06:44</a> — <b>Letters assigned</b>: <span class="mono">p</span> for the new distribution, <span class="mono">q</span> for the one the code was built from; generalise past four symbols to any alphabet.</li>
+    <li><a href="https://youtu.be/GlYgs6v2YfU?t=435" target="_blank" rel="noopener">07:15</a> — <b>The matched case as a reference</b>: weighting <span class="mono">q</span>'s code lengths by <span class="mono">q</span>'s own frequencies is just the entropy <span class="mono">H(q)</span> from part one.</li>
+    <li><a href="https://youtu.be/GlYgs6v2YfU?t=467" target="_blank" rel="noopener">07:47</a> — <b>The definition, and a warning</b>: swap the weights for <span class="mono">p</span> and you have cross-entropy by definition; the notation in the wild is a mess.</li>
+    <li><a href="https://youtu.be/GlYgs6v2YfU?t=499" target="_blank" rel="noopener">08:19</a> — <b>The picture</b>: bars of width <span class="mono">p(x)</span> and height <span class="mono">log₂(1/q(x))</span>; the total area is the cross-entropy.</li>
+  </ul>
+
+  <h2 id="setup">The setup: the plan changed, the codebook didn't</h2>
+  <p>Part one's robot took a biased random walk: <b>up</b> half the time, <b>down</b> a quarter, <b>left</b> and <b>right</b> an eighth each. Those probabilities produced a beautifully clean optimal code — one bit for up, two for down, three each for left and right — because every probability was already a power of one half. Call that distribution <span class="mono">q</span>. It is the distribution the <em>codebook</em> was built from, and from here on that is the only fact about it that matters.</p>
+  <p>Now the mission changes (<a href="https://youtu.be/GlYgs6v2YfU?t=320" target="_blank" rel="noopener">05:20</a>). The agency wants a more rightward journey, so the walk is effectively rotated: <b>right</b> becomes the half-probability symbol, <b>left</b> the quarter, and <b>up</b> and <b>down</b> drop to an eighth each. Call this new distribution <span class="mono">p</span>. Crucially, the transmitter and receiver are hard-coded — nobody is going to fly out and reprogram them — so the old codebook keeps running against the new traffic.</p>
+  <p>Notice how narrow the question now is. Nothing about the code has changed; nothing about the decoder has broken; the messages still arrive unambiguously. The only thing that changed is <em>how often each codeword gets used</em>. So the cost per symbol is a weighted average with the same list of lengths and a new list of weights. That sentence is the whole definition, and everything below is bookkeeping on it.</p>
+
+  <h2 id="numbers">Counting the damage, symbol by symbol</h2>
+  <p>The arithmetic is small enough to do by hand, and doing it by hand is the fastest route to never mixing up the two slots again (<a href="https://youtu.be/GlYgs6v2YfU?t=341" target="_blank" rel="noopener">05:41</a>). The code length of a symbol is set by <span class="mono">q</span>: <span class="mono">ℓ(x) = log₂(1/q(x))</span>. The number of times you pay it is set by <span class="mono">p</span>.</p>
+
+  <table class="kv">
+    <tr><th>symbol</th><th>q(x) — model</th><th>ℓ(x) = log₂(1/q(x))</th><th>p(x) — reality</th><th>p(x)·ℓ(x)</th></tr>
+    <tr><td>up</td><td>1/2</td><td>1 bit</td><td>1/8</td><td>0.125</td></tr>
+    <tr><td>down</td><td>1/4</td><td>2 bits</td><td>1/8</td><td>0.250</td></tr>
+    <tr><td>left</td><td>1/8</td><td>3 bits</td><td>1/4</td><td>0.750</td></tr>
+    <tr><td>right</td><td>1/8</td><td>3 bits</td><td>1/2</td><td>1.500</td></tr>
+    <tr><td><b>total</b></td><td>1</td><td>—</td><td>1</td><td><b>H(p, q) = 2.625 bits</b></td></tr>
+  </table>
+
+  <p>Two more numbers make the table mean something. The old code on the old traffic cost <span class="mono">H(q) = ½·1 + ¼·2 + ⅛·3 + ⅛·3 = 1.75</span> bits — that was part one's answer. And the <em>best possible</em> code for the new traffic would cost <span class="mono">H(p) = ⅛·3 + ⅛·3 + ¼·2 + ½·1 = 1.75</span> bits as well, because <span class="mono">p</span> is just <span class="mono">q</span> with the labels shuffled and entropy does not care which symbol carries which probability. So the mismatch costs exactly <span class="mono">2.625 − 1.75 = 0.875</span> bits per instruction — a 50% inflation of the bill, paid for nothing but pointing the codebook at the wrong distribution. That excess is the Kullback–Leibler divergence <span class="mono">D(p‖q)</span>, which the arc gets to properly later; here it is enough to see that it is a difference of two things this page has already computed.</p>
+
+  <h2 id="definition">The definition, with both slots pinned down</h2>
+  <p>Generalise past four symbols (<a href="https://youtu.be/GlYgs6v2YfU?t=404" target="_blank" rel="noopener">06:44</a>). Let the alphabet be any finite set of symbols — robot moves, English characters, GPT tokens — and let <span class="mono">p</span> and <span class="mono">q</span> be two distributions over it. Then:</p>
+
+<pre class="code-block">   H(p, q)  =   Σ   p(x) · log₂( 1 / q(x) )   =   −  Σ   p(x) · log₂ q(x)
+                x                                     x
+
+            =   𝔼         [ log₂( 1 / q(x) ) ]
+                 x ∼ p
+</pre>
+
+  <p>The expectation form on the second line is the one to memorise, because it names the two roles out loud: the thing being averaged is a <em>property of q</em>, and the distribution you average <em>under</em> is <span class="mono">p</span>. Written as a slot diagram:</p>
+
+<pre class="code-block">   q  →  the MODEL     →  fixes the PRICES     ℓ(x) = log₂(1/q(x))   [inside the log]
+   p  →  REALITY       →  fixes the RATES      how often ℓ(x) is paid [outside the log]
+</pre>
+
+  <p>Say it several ways until one of them sticks. You pay <b>q's prices at p's frequencies</b>. You <b>encode with q, sample from p</b>. <span class="mono">q</span> is your belief; <span class="mono">p</span> is the world. The model is the one you can change, and it is the one buried inside the logarithm — which is exactly why, when this becomes a training loss in P13, the gradient flows through the <span class="mono">q</span> slot and the <span class="mono">p</span> slot is just data.</p>
+  <p>The matched case is the sanity check (<a href="https://youtu.be/GlYgs6v2YfU?t=435" target="_blank" rel="noopener">07:15</a>). Put the same distribution in both slots and the code was built for exactly the traffic it sees: <span class="mono">H(p, p) = Σ p(x)·log₂(1/p(x)) = H(p)</span>. Cross-entropy is a two-argument generalisation of entropy, and entropy is its diagonal. <em>My addition, not Grant's:</em> the diagonal is also the floor — <span class="mono">H(p, q) ≥ H(p)</span> for every <span class="mono">q</span>, with equality only when <span class="mono">q = p</span>. That is Gibbs' inequality, and it is the formal reason "the true distribution is the best possible codebook" is a theorem and not a slogan. P08's coding argument and this inequality are two views of the same fact.</p>
+
+  <h2 id="diagram">The picture: same bars, one axis swapped</h2>
+  <p>Part one drew entropy as an area (<a href="https://youtu.be/GlYgs6v2YfU?t=435" target="_blank" rel="noopener">07:15</a>): one bar per symbol, width <span class="mono">q(x)</span>, height <span class="mono">log₂(1/q(x))</span>, so each bar's area is that symbol's contribution to the weighted sum and the total area is <span class="mono">H(q)</span>. Because width and height are locked to the same distribution, the bars have a characteristic shape — the wide ones are short and the tall ones are thin.</p>
+  <p>Cross-entropy is the same diagram with the widths taken from a different distribution (<a href="https://youtu.be/GlYgs6v2YfU?t=499" target="_blank" rel="noopener">08:19</a>): height stays <span class="mono">log₂(1/q(x))</span>, width becomes <span class="mono">p(x)</span>. Now nothing forces tall bars to be thin, and total area can only go up. In our table, the two three-bit bars — the ones the old code treated as rare — got widened to cover 75% of the traffic, and that single fact is the whole 0.875-bit penalty. This is the picture worth carrying: <b>cross-entropy is entropy's area diagram with the heights and the widths sourced from different distributions</b>, and the excess area over the best-possible packing is the divergence.</p>
+
+  <h2 id="notation">The notational trap, and what libraries actually do</h2>
+  <p>Grant flags this and then declines to fight it, which is the right call for a video (<a href="https://youtu.be/GlYgs6v2YfU?t=467" target="_blank" rel="noopener">07:47</a>):</p>
+  <blockquote class="q"><span>"The specific notation that you'll see out in the wild is a little bit of a mess, there's a lot of different conventions."</span><span class="cite">— Grant Sanderson, <a href="https://youtu.be/GlYgs6v2YfU?t=467" target="_blank" rel="noopener">07:47</a></span></blockquote>
+  <p>Here is the concrete version of that warning. In mathematical writing, <span class="mono">H(p, q)</span> almost universally means <b>true distribution first, model second</b> — the formula at the top of this page. The arguments are <em>not</em> interchangeable: <span class="mono">H(p, q) ≠ H(q, p)</span> in general, so writing them the wrong way round is not a stylistic slip, it computes a different number. But the <em>prose</em> orderings drift even when the symbols do not. Grant's own sentence at 07:47 is "the cross-entropy of the distribution <span class="mono">q</span> relative to the distribution <span class="mono">p</span>", naming the code's distribution first, while much of the machine-learning literature says "the cross-entropy of <span class="mono">p</span> relative to <span class="mono">q</span>" for the same quantity. Do not try to arbitrate this. Anchor on the roles — which distribution set the code lengths, which one sets the frequencies — and re-derive the word order every time.</p>
+  <p>The libraries are worse, because there the order is executable. Two verified examples, opposite to each other:</p>
+  <ul class="outline">
+    <li><b>PyTorch puts the model first.</b> <span class="mono">torch.nn.functional.cross_entropy(input, target)</span> documents <span class="mono">input</span> as "predicted unnormalized logits" and <span class="mono">target</span> as "ground truth class indices or class probabilities" — so the call is <span class="mono">(q, p)</span>, the reverse of <span class="mono">H(p, q)</span>. Same for <span class="mono">kl_div(input, target)</span>, where <span class="mono">input</span> is the model's log-probabilities.</li>
+    <li><b>SciPy and scikit-learn put reality first.</b> <span class="mono">scipy.stats.entropy(pk, qk)</span> computes <span class="mono">Σ pk·log(pk/qk)</span>, matching <span class="mono">D(p‖q)</span>; <span class="mono">sklearn.metrics.log_loss(y_true, y_proba)</span> takes the labels first.</li>
+  </ul>
+  <p>One more practitioner detail that bites: <b>units</b>. Everything on this page is in bits because the logs are base 2. Every one of those library functions uses the natural logarithm, so it returns <b>nats</b>. A language-model loss of 2.1 is 2.1 nats ≈ 3.03 bits per token; divide by <span class="mono">ln 2 ≈ 0.693</span> to convert. Base changes scale cross-entropy, entropy and KL by the same constant, so no comparison between them is affected — but a number quoted with no unit is not yet a number.</p>
+
+  <div class="callout"><b>Carry this:</b> in <span class="mono">H(p, q)</span>, the argument inside the logarithm is the one you are allowed to be wrong about. <span class="mono">q</span> is a claim; <span class="mono">p</span> is a fact. Every use of cross-entropy in the rest of this series — gzip-based language trees, next-token pre-training, distillation — is an instance of "measure a claim against a fact, in bits per symbol."</div>
+
+  <h2 id="edges">Two edges the definition forces on you</h2>
+  <p><b>A model that rules out something that happens pays an unbounded price.</b> If <span class="mono">q(x) = 0</span> for some symbol with <span class="mono">p(x) &gt; 0</span>, then <span class="mono">log₂(1/q(x)) = ∞</span> and the whole sum is infinite. The coding reading is exact and not a technicality: a code built from <span class="mono">q</span> reserves no codeword at all for <span class="mono">x</span>, so when <span class="mono">x</span> shows up you cannot transmit the message at any finite length. This is why every implementation keeps <span class="mono">q</span> strictly positive. PyTorch does it structurally — it takes logits and applies softmax internally, and a softmax output is never exactly zero unless a logit is <span class="mono">−∞</span>. scikit-learn does it by clipping <span class="mono">y_proba</span> into <span class="mono">[eps, 1−eps]</span> at machine precision. Label smoothing (PyTorch's <span class="mono">label_smoothing</span> argument) is the same defence applied to the other slot. If you ever see a loss of <span class="mono">inf</span> or <span class="mono">nan</span> on the first step, this is usually the reason.</p>
+  <p><b>The reverse edge is free.</b> If <span class="mono">p(x) = 0</span>, the term is <span class="mono">0·log₂(1/q(x))</span>, which is taken to be <span class="mono">0</span> by the standard convention (justified by the limit <span class="mono">t·log(1/t) → 0</span> as <span class="mono">t → 0⁺</span>) — even when <span class="mono">q(x)</span> is tiny and the log is huge. So a model may believe in events that never occur and pay no direct penalty for them. It still pays indirectly: probability mass spent on the impossible is mass unavailable to the actual symbols, which lengthens their codewords. The asymmetry between these two edges is the seed of the "mode-covering vs mode-seeking" distinction you meet later with KL.</p>
+
+  <h2 id="stuck">Where people get stuck</h2>
+  <p><b>"Which one is the model again?"</b> — the confusion this page exists to kill. Two independent checks that never fail. (1) Only <span class="mono">q</span> appears inside a logarithm; code lengths are logs of the model's probabilities, so whatever is inside the log is the codebook. (2) Weights in an average must be the frequencies things actually happen at, and only reality can supply those, so the bare multiplier out front is <span class="mono">p</span>. If a formula has the model outside and reality inside, it is <span class="mono">H(q, p)</span> — a legitimate quantity, but a different one.</p>
+  <p><b>"This example gave the same answer both ways, so cross-entropy must be symmetric."</b> — a real trap set by the toy numbers. Compute <span class="mono">H(q, p)</span> from the table: <span class="mono">½·3 + ¼·3 + ⅛·2 + ⅛·1 = 2.625</span>, identical to <span class="mono">H(p, q)</span>. That is an accident of this example: <span class="mono">p</span> is obtained from <span class="mono">q</span> by swapping up↔right and down↔left, and that relabelling is its own inverse, which forces the two numbers to agree. Change one probability and the coincidence dies. Grant demolishes the symmetry assumption with a 90/10 example immediately after this stretch — that is P10's job.</p>
+  <p><b>"Is <span class="mono">log₂(1/q)</span> the same as <span class="mono">−log₂ q</span>, and why write it the awkward way?"</b> — algebraically identical; rhetorically not. Since <span class="mono">q(x) ≤ 1</span>, <span class="mono">log₂(1/q(x)) ≥ 0</span>, so the reciprocal form makes every term a manifestly non-negative <em>length in bits</em>, which is what it physically is. The <span class="mono">−log</span> form saves ink and hides a sign you then have to remember. Both appear constantly; read them as the same thing.</p>
+  <p><b>"2.625 bits is not a whole number of bits — what is being transmitted?"</b> — in this toy example the codeword lengths <em>are</em> whole numbers (1, 2, 3); it is only their <em>average</em> that is fractional, and averages of integers are routinely fractional. In general, code lengths themselves come out fractional too, and that is still meaningful: as part one argued, the information content of a long message is the sum of per-symbol contents, and arithmetic coding realises fractional per-symbol costs by encoding the whole message at once rather than symbol by symbol.</p>
+
+  <h2 id="further">Going deeper, verified</h2>
+  <ul class="readings">
+    <li><a href="https://people.math.harvard.edu/~ctm/home/text/others/shannon/entropy/entropy.pdf" target="_blank" rel="noopener">A Mathematical Theory of Communication</a> — Claude Shannon (1948) · The source of <span class="mono">log(1/p)</span> as information content and of entropy as the cost floor; §6 is the part this page rests on.</li>
+    <li><a href="https://www.inference.org.uk/mackay/itila/book.html" target="_blank" rel="noopener">Information Theory, Inference, and Learning Algorithms</a> — David MacKay (2003) · Free full text; chapters 4–6 build the same coding picture and give the "wrong codebook" cost as relative entropy, with proofs.</li>
+    <li><a href="https://docs.pytorch.org/docs/stable/generated/torch.nn.functional.cross_entropy.html" target="_blank" rel="noopener">torch.nn.functional.cross_entropy</a> — PyTorch docs · Read the parameter table against the formula above: <span class="mono">input</span> is the model, <span class="mono">target</span> is reality, and the order is the reverse of <span class="mono">H(p, q)</span>.</li>
+    <li><a href="https://docs.scipy.org/doc/scipy/reference/generated/scipy.stats.entropy.html" target="_blank" rel="noopener">scipy.stats.entropy</a> — SciPy docs · The opposite convention (<span class="mono">pk</span> first), and a one-line way to check every number in this page's table.</li>
+    <li><a href="https://youtu.be/l6DKRf-fAAM" target="_blank" rel="noopener">But what is information theory? (Compression is Intelligence Part 1)</a> — 3Blue1Brown · The prerequisite: where the robot's optimal code and the entropy area diagram come from.</li>
+  </ul>
+
+  <h2 id="exercises">Exercises</h2>
+  <ol class="exercises">
+    <li><b>Reproduce the 2.625</b> — In a notebook, define <span class="mono">q = [1/2, 1/4, 1/8, 1/8]</span> and <span class="mono">p = [1/8, 1/8, 1/4, 1/2]</span> and compute <span class="mono">H(p)</span>, <span class="mono">H(q)</span>, <span class="mono">H(p, q)</span>, <span class="mono">H(q, p)</span> and <span class="mono">D(p‖q)</span> in bits. A good answer reports 1.75, 1.75, 2.625, 2.625, 0.875, states the identity <span class="mono">H(p, q) = H(p) + D(p‖q)</span> that ties them together, and explains in one sentence why the two cross-entropies coincide here without concluding that cross-entropy is symmetric.</li>
+    <li><b>Break the accident</b> — Change a single entry so the relabelling symmetry is gone: keep <span class="mono">q = [1/2, 1/4, 1/8, 1/8]</span> and use <span class="mono">p = [0.05, 0.05, 0.30, 0.60]</span>. Recompute <span class="mono">H(p, q)</span> and <span class="mono">H(q, p)</span>. A good answer shows the two numbers now differ, says which slot each distribution occupied in each case, and identifies which symbol contributed the largest single term to each sum.</li>
+    <li><b>Find the infinity, then tame it</b> — Set <span class="mono">q = [0.5, 0.5, 0.0, 0.0]</span> against the same <span class="mono">p</span> and evaluate <span class="mono">H(p, q)</span> by hand; then evaluate <span class="mono">H(q, p)</span> by hand. A good answer gets <span class="mono">∞</span> for the first and a finite number for the second, explains the difference purely in coding terms (no codeword exists for a symbol that occurs, versus wasted probability on symbols that never occur), and then re-runs the first with <span class="mono">q</span> smoothed to <span class="mono">[0.49, 0.49, 0.01, 0.01]</span> to show what an implementation's clipping is buying you.</li>
+  </ol>
+
+  <div class="callout">Previous: <a class="lnk" href="p08.html">P08 Recap: what makes a code optimal</a> · Next: <a class="lnk" href="p10.html">P10 Intuition: what a wrong model costs you</a> · Back to the <a class="lnk" href="../index.html#cross-entropy">map</a>.</div>
+</main>
+<footer>Original explanation of 3Blue1Brown's <i>But what is cross-entropy? | Compression is Intelligence Part 2</i>. The lesson and animations are Grant Sanderson's; this page links to them, it does not copy them.</footer>
+</body>
+</html>

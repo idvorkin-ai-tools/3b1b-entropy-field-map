@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>P02 The warmup: four instructions, three students, and prefix codes — Entropy, mapped</title>
+<meta name="description" content="A moon robot, four unequal instructions, and the variable-length code that averages 1.75 bits: prefix-free codes, the binary tree, and Kraft's inequality." />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="../paper.css" />
+</head>
+<body>
+<header class="bar"><div class="bar-in">
+  <div class="brand"><span class="dot"></span>ENTROPY&nbsp;//&nbsp;FIELD&nbsp;MAP</div>
+  <a class="back" href="../index.html#entropy">← field map</a>
+</div></header>
+<main>
+  <div class="eyebrow"><span class="box wb mono">P02 · REINVENTING ENTROPY</span><span class="mono">3Blue1Brown · 03:28–10:46 · 7 min</span></div>
+  <h1>The warmup: four instructions, three students, and prefix codes</h1>
+  <div class="authors">Reinventing Entropy | Compression is Intelligence Part 1 — the "warmup example" chapter, from the moon robot through the binary-tree picture of prefix codes.</div>
+  <div class="paperlink" style="border-left-color:var(--off)"><span class="lbl">Watch</span><a href="https://youtu.be/l6DKRf-fAAM?t=208" target="_blank" rel="noopener">Reinventing Entropy | Compression is Intelligence Part 1 — 3Blue1Brown, from 03:28 ↗</a></div>
+  <p class="mono" style="font-size:12.5px;color:var(--ink-dim)">Transcript: <a class="lnk" href="../transcripts/part1.html#s-208">this stretch, timestamped</a></p>
+
+  <div class="tldr"><b>TL;DR —</b> A robot on a distant moon takes four instructions whose probabilities are ½, ¼, ⅛, ⅛. Two bits each is the obvious encoding; the better one is <span class="mono">0 / 10 / 110 / 111</span>, which averages exactly 1.75 bits per instruction because it spends its short code word on the common symbol. It decodes without separators because no code word is a prefix of another — equivalently, the code words are leaves of a binary tree, and each one of length <span class="mono">l</span> claims a <span class="mono">2⁻ˡ</span> share of a budget that sums to at most 1 (Kraft's inequality). Here the four shares are ½ + ¼ + ⅛ + ⅛ = 1: the budget is exactly spent, and — the hint the whole series turns on — each symbol's share is exactly its probability.</div>
+
+  <p class="lead">The previous page set up the claim that compression and prediction are the same problem wearing different clothes. This page is where the series stops gesturing and starts computing. Grant deliberately picks a toy so rigged that the arithmetic comes out in whole numbers: four symbols, probabilities that are all powers of ½, and a fiction of independence. Everything that will later be said about entropy, about fractional bits, and about the compressibility of English is visible in miniature here, minus the mess. By the end of this stretch you have a code that beats the naive one, a structural reason it decodes unambiguously, and an unexplained coincidence — code-word shares that match probabilities exactly — which is the hook for the next page.</p>
+
+  <h2 id="outline">Outline, with timestamps</h2>
+  <ul class="outline">
+    <li><a href="https://youtu.be/l6DKRf-fAAM?t=208" target="_blank" rel="noopener">03:28</a> — Setup: a robot on a faraway moon, driven by instructions sent from Earth.</li>
+    <li><a href="https://youtu.be/l6DKRf-fAAM?t=218" target="_blank" rel="noopener">03:38</a> — The distribution: up ½, down ¼, left ⅛, right ⅛, and every instruction independent of the last.</li>
+    <li><a href="https://youtu.be/l6DKRf-fAAM?t=248" target="_blank" rel="noopener">04:08</a> — The puzzle: bits are slow and costly to send. Three students take a crack at it.</li>
+    <li><a href="https://youtu.be/l6DKRf-fAAM?t=278" target="_blank" rel="noopener">04:38</a> — Student one, straightforward: two bits each, decoded by chopping the stream into pairs.</li>
+    <li><a href="https://youtu.be/l6DKRf-fAAM?t=341" target="_blank" rel="noopener">05:41</a> — Student two, clever: <span class="mono">0 / 10 / 110 / 111</span>, and the weighted sum that gives 1.75 bits.</li>
+    <li><a href="https://youtu.be/l6DKRf-fAAM?t=373" target="_blank" rel="noopener">06:13</a> — The saving shown on an actual sampled stream, not just in expectation.</li>
+    <li><a href="https://youtu.be/l6DKRf-fAAM?t=433" target="_blank" rel="noopener">07:13</a> — Decoding from the robot's side: read bits until they form a complete code word.</li>
+    <li><a href="https://youtu.be/l6DKRf-fAAM?t=467" target="_blank" rel="noopener">07:47</a> — The rule that makes it work: no code word may be a prefix of another. A fifth code word <span class="mono">100</span> would break it.</li>
+    <li><a href="https://youtu.be/l6DKRf-fAAM?t=497" target="_blank" rel="noopener">08:17</a> — The name (prefix-free code / prefix code) and the diagram of all binary strings.</li>
+    <li><a href="https://youtu.be/l6DKRf-fAAM?t=560" target="_blank" rel="noopener">09:20</a> — Every string is a prefix of everything above it, so choosing <span class="mono">0</span> for "up" consumes half the space.</li>
+    <li><a href="https://youtu.be/l6DKRf-fAAM?t=590" target="_blank" rel="noopener">09:50</a> — ½ + ¼ + ⅛ + ⅛, nothing left over — and the shares equal the probabilities.</li>
+    <li><a href="https://youtu.be/l6DKRf-fAAM?t=623" target="_blank" rel="noopener">10:23</a> — "Better" is not "best": the third student arrives, and the argument moves to the next page.</li>
+  </ul>
+
+  <h2 id="setup">A rigged little problem, and why the rigging is the point</h2>
+  <p>The scenario is an uplink budget. A robot wanders the surface of a moon; from Earth you send it one of four movement instructions at a time, over a channel where every bit is expensive. The instructions are <em>not</em> equally likely — <a href="https://youtu.be/l6DKRf-fAAM?t=218" target="_blank" rel="noopener">half of what you send is "up"</a>, a quarter is "down", an eighth is "left", an eighth is "right" — and Grant adds a second simplification: each instruction is drawn independently, with no dependence on what came before.</p>
+  <p>Independence is what makes a per-symbol code the right object at all. If instruction <span class="mono">n+1</span> were predictable from instruction <span class="mono">n</span>, encoding each symbol in isolation would leave compression on the table, and you would want a conditional distribution instead of one fixed one. Language, the real target of the series, violates this badly — which is why the general case needs a heavier machine later.</p>
+  <p>The second rigging is subtler: every probability here is a power of ½. Call such a distribution <b>dyadic</b> (my term for it, not Grant's — it is the standard one). That choice guarantees that the ideal number of bits for each symbol, <span class="mono">log₂(1/p)</span>, is a whole number: 1, 2, 3, 3. In the toy, "the best possible code" is achievable exactly rather than approached in a limit. The moment probabilities stop being powers of ½ — as they do for English letters — the ideal per-symbol cost becomes fractional, no code word can be 4.19 bits long, and the whole framework has to be lifted from single symbols to long messages. Grant is spending this seven minutes buying an example where that complication is switched off.</p>
+
+  <h2 id="flat">Student one: two bits, flat</h2>
+  <p>The <a href="https://youtu.be/l6DKRf-fAAM?t=278" target="_blank" rel="noopener">straightforward answer</a> is a fixed-length code: <span class="mono">00</span> = up, <span class="mono">01</span> = down, <span class="mono">10</span> = left, <span class="mono">11</span> = right. Two bits, always. In general a fixed-length binary code for <span class="mono">n</span> symbols needs <span class="mono">⌈log₂ n⌉</span> bits, and with <span class="mono">n = 4</span> that is exactly 2.</p>
+  <p>This is not a strawman; it is the sane engineering default, and it has one virtue the clever code will have to earn back. Decoding is not just trivial but <em>positional</em>: bits 2k and 2k+1 are always one instruction, so you can seek into the middle of the stream and never need to have read the beginning. Its defect is equally clear — it treats "up" and "right" as equally deserving of bandwidth even though you send "up" four times for every "right".</p>
+
+  <h2 id="clever">Student two: spend the short words where the probability mass is</h2>
+  <p>The <a href="https://youtu.be/l6DKRf-fAAM?t=341" target="_blank" rel="noopener">clever student's code</a> lets the code words differ in length: a single bit <span class="mono">0</span> for up, two bits <span class="mono">10</span> for down, three bits <span class="mono">110</span> for left, three bits <span class="mono">111</span> for right. The cost of a code that varies in length is no longer a single number, so you ask for the expected cost per instruction — the weighted sum of the lengths, weighted by how often each length is actually paid.</p>
+  <table class="kv">
+    <tr><th>Symbol</th><th>Probability p</th><th>Code word</th><th>Length l</th><th>Contribution p·l</th></tr>
+    <tr><td>up</td><td>½ = 0.5</td><td class="mono">0</td><td>1</td><td>0.5 × 1 = 0.500</td></tr>
+    <tr><td>down</td><td>¼ = 0.25</td><td class="mono">10</td><td>2</td><td>0.25 × 2 = 0.500</td></tr>
+    <tr><td>left</td><td>⅛ = 0.125</td><td class="mono">110</td><td>3</td><td>0.125 × 3 = 0.375</td></tr>
+    <tr><td>right</td><td>⅛ = 0.125</td><td class="mono">111</td><td>3</td><td>0.125 × 3 = 0.375</td></tr>
+    <tr><td><b>total</b></td><td>1.000</td><td>—</td><td>—</td><td><b>1.750 bits / instruction</b></td></tr>
+  </table>
+  <p>So the average length is <span class="mono">L = Σ p(x)·l(x) = 1.75</span> bits, against the flat code's 2.00 — a saving of a quarter of a bit per instruction, or 12.5% of the uplink. The trade is explicit in the table: the clever student pays an <em>extra</em> bit for left and right relative to the flat code, and those two rows cost 0.75 bits between them instead of 0.5. That penalty is more than repaid by the up row, which drops from 1.0 to 0.5. You lose on the rare symbols and win, bigger, on the common one.</p>
+  <p>Grant then shows the saving <a href="https://youtu.be/l6DKRf-fAAM?t=373" target="_blank" rel="noopener">on an actual sampled stream</a>, not only in expectation — worth pausing on, because 1.75 is an average and a short message can come out longer than the flat code would have made it. Four "right"s cost 12 bits here and 8 there. The guarantee is asymptotic, and it is about the source, not any single transmission.</p>
+  <p><b>An addition Grant holds back until later:</b> compute <span class="mono">Σ p·log₂(1/p)</span> for this distribution and you get <span class="mono">½·1 + ¼·2 + ⅛·3 + ⅛·3 = 1.75</span> — the same number. That is the Shannon entropy of the source, and the fact that it coincides exactly with the clever student's average length is not luck; it is what "dyadic distribution" buys you. Hold that coincidence; the series spends the next twenty minutes explaining it.</p>
+
+  <h2 id="prefix">Why the robot never needs a separator</h2>
+  <p>Variable-length code words raise an obvious alarm, and Grant raises it deliberately: if instructions have different lengths, how does the receiver know where one ends and the next begins? There is no comma in the bitstream, no length header, no delimiter — the robot gets an undivided run of ones and zeros.</p>
+  <p>Take the receiver's <a href="https://youtu.be/l6DKRf-fAAM?t=433" target="_blank" rel="noopener">point of view</a> and walk a stream one bit at a time. Read <span class="mono">1</span>: not a complete code word, but it rules out "up", so you are somewhere among down / left / right. Read <span class="mono">0</span>: the accumulated <span class="mono">10</span> is a complete code word and nothing else starts that way, so emit "down" and reset. Read <span class="mono">0</span>: complete on the spot — "up". Read <span class="mono">1</span>, then <span class="mono">1</span>: still ambiguous, still a live prefix of both <span class="mono">110</span> and <span class="mono">111</span>. Read <span class="mono">0</span>: <span class="mono">110</span>, emit "left".</p>
+  <pre class="code-block">stream:   1 0   0   1 1 0   ...
+          |___| |_| |_____|
+          down  up    left</pre>
+  <p>The decoding rule is one sentence: consume bits until what you hold is a code word, emit it, start over. That works if and only if you can never hold a code word while a <em>longer</em> one is still possible — that is, if and only if <b>no code word is a prefix of another</b>. Grant makes the failure concrete: <a href="https://youtu.be/l6DKRf-fAAM?t=467" target="_blank" rel="noopener">add a fifth instruction with code word <span class="mono">100</span></a> and the scheme dies, because after reading <span class="mono">10</span> the receiver cannot tell whether it is finished (that was "down") or should keep reading (this is the new symbol). The stream stops being self-delimiting.</p>
+  <blockquote class="q"><span>"It's known in the business as a prefix-free code, or what is confusingly synonymous, it's actually more commonly known as a prefix code."</span><span class="cite">— Grant Sanderson, <a href="https://youtu.be/l6DKRf-fAAM?t=497" target="_blank" rel="noopener">08:17</a></span></blockquote>
+  <p>He is right that the naming is unfortunate. "Prefix code" is shorthand for "prefix-free code" — a code in which no code word is a prefix of another. Both names are in wide use for the same object; the older literature also calls it an <em>instantaneous</em> code, which is the most descriptive of the three, because the defining property is precisely that the decoder can commit to a symbol the instant its last bit arrives, without lookahead.</p>
+
+  <h2 id="tree">The tree, and the budget it enforces</h2>
+  <p>The <a href="https://youtu.be/l6DKRf-fAAM?t=497" target="_blank" rel="noopener">diagram Grant draws</a> is the space of all binary strings, layered by length: layer 1 is <span class="mono">0</span> and <span class="mono">1</span>, layer 2 is <span class="mono">00 01 10 11</span>, and so on, with everything beginning <span class="mono">0</span> stacked over the left half and everything beginning <span class="mono">1</span> over the right half, recursively. Structurally it is the infinite binary tree: a string is a path down from the root, left for <span class="mono">0</span> and right for <span class="mono">1</span>, and <a href="https://youtu.be/l6DKRf-fAAM?t=560" target="_blank" rel="noopener">every string is a prefix of exactly the strings sitting above it</a> — its descendants.</p>
+  <pre class="code-block">                    root
+                 0 /    \ 1
+                  /      \
+              [ UP ]      *
+              1 bit    0 /   \ 1
+              1/2       /     \
+                   [ DOWN ]    *
+                    2 bits  0 /  \ 1
+                    1/4      /    \
+                       [ LEFT ]  [ RIGHT ]
+                        3 bits    3 bits
+                         1/8        1/8</pre>
+  <p>In this picture the prefix-free condition is one line: <b>the code words must be leaves</b>. Claiming a node forbids its entire subtree, since every descendant has that node as a prefix. So a code word of length <span class="mono">l</span> does not merely cost <span class="mono">l</span> bits to transmit — it <em>claims a <span class="mono">2⁻ˡ</span> fraction of the whole tree</em> and takes it out of circulation. Short code words are expensive in exactly this currency: <span class="mono">0</span> for "up" eats half of all possible strings.</p>
+  <p>Add up what the clever student's four claims consume:</p>
+  <pre class="code-block">Σ 2⁻ˡ  =  2⁻¹ + 2⁻² + 2⁻³ + 2⁻³
+       =   ½  +  ¼  +  ⅛  +  ⅛
+       =   1        &lt;-- budget exactly spent; nothing left over</pre>
+  <p><b>The formal statement — my addition; Grant draws the picture but does not name the theorem — is Kraft's inequality.</b> A binary prefix-free code with code-word lengths <span class="mono">l₁, …, lₙ</span> exists if and only if <span class="mono">Σᵢ 2⁻ˡⁱ ≤ 1</span>. It is due to Leon Kraft's 1949 MIT master's thesis; McMillan proved in 1956 that the same bound binds <em>any</em> uniquely decodable code, which is the deeper result — instantaneous decoding costs you nothing in achievable lengths. A code meeting it with equality, as this one does, is <b>complete</b>: every leaf is used.</p>
+  <p>The inequality is what turns "spend short words on common symbols" from a slogan into an accounting constraint. Lengths are not independently choosable. Shortening one code word by a bit doubles its claim on the tree, and something else has to give up room: from ⅛ + ⅛ = ¼, if you promote "left" to a 2-bit word it takes ¼ on its own and "right" has to move up a level, and you have paid a bit to save a bit. There is no free shortening anywhere in a complete code. That is the same "push the bump down and it pops up elsewhere" trade the third student will exploit on the next page, stated in advance and in exact form.</p>
+
+  <div class="callout"><b>Carry this away.</b> A variable-length code is a set of leaves in a binary tree, and its lengths obey one hard budget: <span class="mono">Σ 2⁻ˡ ≤ 1</span>. Everything about designing codes is deciding how to spend that budget across symbols, and the natural move — give symbol <span class="mono">x</span> the share <span class="mono">2⁻ˡ⁽ˣ⁾ = p(x)</span>, i.e. length <span class="mono">l(x) = log₂(1/p(x))</span> — is available exactly when the probabilities are powers of ½. Every difficulty in the rest of the series comes from that condition failing.</div>
+
+  <h2 id="huffman">Huffman: the algorithm behind the clever student's guess</h2>
+  <p>Grant presents this code as a stroke of cleverness rather than the output of a procedure, and does not name one. There is one, and it is worth knowing: <b>Huffman coding</b> (David A. Huffman, <em>A Method for the Construction of Minimum-Redundancy Codes</em>, Proceedings of the IRE, 1952) builds the optimal prefix code for a known symbol distribution, and does it greedily from the leaves up. Repeatedly take the two least probable nodes, merge them under a new parent whose probability is their sum, and repeat until one node remains; the depth a symbol ends up at is its code-word length.</p>
+  <pre class="code-block">start    1/2 (up)   1/4 (down)   1/8 (left)   1/8 (right)
+merge    1/8 + 1/8 = 1/4      ->   1/2 · 1/4 · [1/4]
+merge    1/4 + 1/4 = 1/2      ->   1/2 · [1/2]
+merge    1/2 + 1/2 = 1        ->   root
+depths   up 1 · down 2 · left 3 · right 3   ->  L = 1.75 bits</pre>
+  <p>Run it on this distribution and you get lengths 1, 2, 3, 3 — precisely the clever student's code. So yes: what Grant shows is <em>a</em> Huffman code for this source. The hedge on "a" is real and small: Huffman fixes the multiset of lengths, not the bit patterns, since you may swap the <span class="mono">0</span> and <span class="mono">1</span> labels at any branch and, when probabilities tie, merge in either order. <span class="mono">1 / 01 / 001 / 000</span> is an equally valid Huffman code here. What is uniquely determined, and what optimality is about, is the average length 1.75.</p>
+  <p>Two caveats that matter later: Huffman is optimal only <em>among codes that give each symbol a whole number of bits</em>, and it meets the entropy exactly only for dyadic sources — in general it can overshoot by up to about a bit per symbol, painfully so when one symbol has probability near 1. It also assumes a fixed, known distribution. Arithmetic coding, which the third video builds toward, escapes both limits.</p>
+
+  <h2 id="hook">The coincidence, and the objection that opens the next page</h2>
+  <p>Now put the two tables side by side. The share of the tree each code word claims is ½, ¼, ⅛, ⅛. The probability of each instruction is ½, ¼, ⅛, ⅛. <a href="https://youtu.be/l6DKRf-fAAM?t=590" target="_blank" rel="noopener">They are the same numbers</a>, and neither the tree nor the arithmetic knew about the other — the tree shares came from a geometric constraint on prefix-free strings, the probabilities came from the physics of the mission.</p>
+  <blockquote class="q"><span>"And in fact, that tickling sensation of a relationship between data size and probabilities is exactly the founding insight for information theory."</span><span class="cite">— Grant Sanderson, <a href="https://youtu.be/l6DKRf-fAAM?t=590" target="_blank" rel="noopener">09:50</a></span></blockquote>
+  <p>Read the coincidence as an equation and you have the whole of the next stretch in embryo. If a symbol of probability <span class="mono">p</span> should claim exactly a <span class="mono">p</span> share of the tree, then <span class="mono">2⁻ˡ = p</span>, so <span class="mono">l = log₂(1/p) = −log₂ p</span>. Under that allocation the average length becomes <span class="mono">Σ p·log₂(1/p)</span> — the expression that will be named entropy, arrived at not by definition but by asking how to spend a budget.</p>
+  <p>Grant refuses to let you cash that in yet. <a href="https://youtu.be/l6DKRf-fAAM?t=623" target="_blank" rel="noopener">"Better than 2.00" is not "provably best"</a>: what rules out an exotic scheme that encodes long <em>runs</em> of instructions jointly and beats 1.75 on average? Nothing here does — this chapter argues about one fixed symbol-by-symbol code, and the question is about all codes. That is the third student's brief: the head-in-the-clouds one who reasons about what a perfect code must look like rather than building one. Their argument — random noise is incompressible, so perfect output must look like random noise — starts at this page's boundary and is the substance of the next.</p>
+
+  <h2 id="stuck">Where people get stuck</h2>
+  <p><b>"1.75 bits" sounds like a fractional bit is being sent.</b> It is not. Every transmission here is a whole number of bits; 1.75 is an expected value over the source distribution, the way an average family size of 2.3 does not imply a fractional child. Fractional information per symbol becomes a genuinely meaningful quantity later, once the argument moves from single symbols to long messages — but in this chapter every quantity is an average of integers, and no code word is 1.75 bits long.</p>
+  <p><b>Confusing "prefix-free" with "no code word contains another".</b> The condition is only about prefixes — the beginning. <span class="mono">110</span> contains <span class="mono">10</span> as a substring and that is completely fine; the decoder is reading left to right and never asks about interior matches. What is fatal is a code word that is an initial segment of another, because that is the case where the decoder has a complete symbol in hand and cannot tell whether to stop.</p>
+  <p><b>"Why not shorten several code words at once?"</b> Because of the budget. It is tempting to think the tree has spare room somewhere. It does not, once the code is complete: ½ + ¼ + ⅛ + ⅛ is already 1, and any shortening pushes the sum above 1, which Kraft's inequality says is impossible for a prefix-free code. Shortening one word always forces another to lengthen, and on a source you have already matched, the trade is a net loss.</p>
+  <p><b>Assuming variable-length always wins.</b> It wins here because the distribution is skewed. On a uniform source over four symbols, the Huffman code <em>is</em> the flat two-bit code, and any variable-length alternative does strictly worse in expectation. Variable-length coding buys you nothing without non-uniformity to exploit — which is the first quiet appearance of the series' thesis that compression is only possible where prediction is.</p>
+  <p><b>Forgetting that independence was assumed, not derived.</b> Grant stipulates that each instruction is drawn independently of the preceding ones. Drop that and the per-symbol code stops being the right object entirely: a source that alternates up, down, up, down is fully predictable and compresses to nearly nothing, yet its symbol frequencies are ½ and ½ and any memoryless code would spend a bit per instruction. The whole difficulty of the language case is exactly this gap.</p>
+
+  <h2 id="further">Going deeper, verified</h2>
+  <ul class="readings">
+    <li><a href="https://people.math.harvard.edu/~ctm/home/text/others/shannon/entropy/entropy.pdf" target="_blank" rel="noopener">A Mathematical Theory of Communication</a> — Claude E. Shannon (1948) · Linked in the video description. Sections 5–9 contain the noiseless coding theorem that the third student is groping toward; the prefix-code construction appears there as the "Shannon–Fano" style argument.</li>
+    <li><a href="https://colah.github.io/posts/2015-09-Visual-Information/" target="_blank" rel="noopener">Visual Information Theory</a> — Christopher Olah (2015) · Grant credits this post in the description as the source of the way he visualises entropy; it develops the same "code words claim fractions of the space" picture at length, with better pictures than any textbook.</li>
+    <li><a href="https://doi.org/10.1109/JRPROC.1952.273898" target="_blank" rel="noopener">A Method for the Construction of Minimum-Redundancy Codes</a> — David A. Huffman (1952) · Four pages. The algorithm that produces the clever student's code, and the proof that no other prefix code does better on a fixed symbol distribution.</li>
+    <li><a href="https://dspace.mit.edu/handle/1721.1/12390" target="_blank" rel="noopener">A device for quantizing, grouping, and coding amplitude-modulated pulses</a> — Leon G. Kraft (1949) · The MIT master's thesis where the inequality <span class="mono">Σ 2⁻ˡ ≤ 1</span> first appears, in a context that has nothing to do with text compression.</li>
+    <li><a href="https://en.wikipedia.org/wiki/Kraft%E2%80%93McMillan_inequality" target="_blank" rel="noopener">Kraft–McMillan inequality</a> — Wikipedia · The cleanest short statement of both directions, including McMillan's 1956 extension to all uniquely decodable codes, with the counting proof.</li>
+  </ul>
+
+  <h2 id="exercises">Exercises</h2>
+  <ol class="exercises">
+    <li><b>Check the budget, then break it</b> — Verify <span class="mono">Σ 2⁻ˡ = 1</span> for the lengths (1, 2, 3, 3). Then take the length vector (1, 2, 2, 3) and decide, without trying to build a code, whether a prefix-free code with those lengths can exist. A good answer computes <span class="mono">½ + ¼ + ¼ + ⅛ = 1.125 &gt; 1</span>, concludes no by Kraft, and then confirms it concretely: after spending <span class="mono">0</span> and two 2-bit words you have used the whole tree and there is no leaf left for the 3-bit word.</li>
+    <li><b>A non-dyadic source</b> — Take p = (0.4, 0.3, 0.2, 0.1) over four symbols. Run Huffman by hand, write down the code words, and compute the average length. Then compute <span class="mono">H = Σ p·log₂(1/p)</span>. A good answer gets lengths (1, 2, 3, 3) with <span class="mono">L = 1.90</span> bits and <span class="mono">H ≈ 1.8464</span> bits, and notices the 0.054-bit gap — the price of rounding each symbol to a whole number of bits, which is zero in Grant's rigged example and never zero here.</li>
+    <li><b>Write the decoder</b> — Implement the clever student's code in twenty lines: an encoder mapping the four instructions to bit strings, and a decoder that walks the stream maintaining only a current node in the tree. Sample 10,000 instructions from (½, ¼, ⅛, ⅛), encode, decode, and confirm you recover the original. A good answer reports a measured bits-per-instruction close to 1.75, notes how far a single 10,000-symbol run deviates from it, and shows that inserting the rogue code word <span class="mono">100</span> as a fifth symbol makes the decoder ambiguous on a concrete stream.</li>
+  </ol>
+
+  <div class="callout">Previous: <a class="lnk" href="p01.html">P01 "Compression is intelligence" — what the claim means</a> · Next: <a class="lnk" href="p03.html">P03 What perfect compression looks like</a> · Back to the <a class="lnk" href="../index.html#entropy">map</a>.</div>
+</main>
+<footer>Original explanation of 3Blue1Brown's Reinventing Entropy | Compression is Intelligence Part 1. The lesson and animations are Grant Sanderson's; this page links to them, it does not copy them.</footer>
+</body>
+</html>
