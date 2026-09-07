@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>P20 The one-line implementation — Entropy, mapped</title>
+<meta name="description" content="Why the whole Hamming encoder and decoder collapse to one XOR of the indices of the bits that are on — and what that says about redundancy." />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="../paper.css" />
+</head>
+<body>
+<header class="bar"><div class="bar-in">
+  <div class="brand"><span class="dot"></span>ENTROPY&nbsp;//&nbsp;FIELD&nbsp;MAP</div>
+  <a class="back" href="../index.html#hamming">← field map</a>
+</div></header>
+<main>
+  <div class="eyebrow"><span class="box bb mono">P20 · REDUNDANCY ON PURPOSE</span><span class="mono">3Blue1Brown · 00:00–16:50 · 17 min</span></div>
+  <h1>The one-line implementation</h1>
+  <div class="authors">Hamming codes, part 2 — the whole video, from the reveal to Grant's closing note on Shannon</div>
+  <div class="paperlink" style="border-left-color:var(--def)"><span class="lbl">Watch</span><a href="https://youtu.be/b3NxrZOu_CE?t=0" target="_blank" rel="noopener">Hamming codes part 2: The one-line implementation — 3Blue1Brown, from 00:00 ↗</a></div>
+  <p class="mono" style="font-size:12.5px;color:var(--ink-dim)">Transcript: <a class="lnk" href="../transcripts/hamming2.html#s-0">this stretch, timestamped</a></p>
+
+  <div class="tldr"><b>TL;DR —</b> Part 1 built Hamming codes as four parity checks that binary-search their way to a flipped bit. This video shows that all four checks are one operation: XOR together the <em>indices</em> of every bit that is turned on. The result is <span class="mono">0</span> for a clean block and the index of the flipped bit otherwise — decoder and encoder both, in one line. The reason is exact, not cute: bit <span class="mono">k</span> of that XOR is by definition the parity of the group of positions whose <span class="mono">k</span>-th index bit is 1, so one XOR computes all the syndromes at once. Remember the equivalence, not the trick.</div>
+
+  <p class="lead">This is the last page of the map, and it closes the arc that started with compression. The first half of this site watched Shannon's entropy set a floor on how short a message can be made: squeeze until the encoded stream is statistically indistinguishable from a fair coin. This arc runs the same machinery backwards. A stream that looks like coin flips has no slack left in it, so a single flipped bit is unrecoverable — you cannot tell it from a different legitimate message. Error correction therefore <em>re-inserts</em> redundancy, but a measured amount, placed where it does maximum work. <a class="lnk" href="p19.html">P19</a> derived Hamming's placement by hand. This page shows that the derivation, once you believe it, compresses into a single line of code, and then steps back to ask what having four descriptions of the same object buys you.</p>
+
+  <h2 id="outline">Outline, with timestamps</h2>
+  <ul class="outline">
+    <li><a href="https://youtu.be/b3NxrZOu_CE?t=0" target="_blank" rel="noopener">00:00</a> — Recap: parity groups that binary-search down to a single flipped bit.</li>
+    <li><a href="https://youtu.be/b3NxrZOu_CE?t=31" target="_blank" rel="noopener">00:31</a> — The reveal: read the four check results as bits and they spell the error's position.</li>
+    <li><a href="https://youtu.be/b3NxrZOu_CE?t=91" target="_blank" rel="noopener">01:31</a> — Relabel the 16 slots in binary; each index bit <em>defines</em> one parity group.</li>
+    <li><a href="https://youtu.be/b3NxrZOu_CE?t=220" target="_blank" rel="noopener">03:40</a> — Why the parity bits live at 1, 2, 4, 8: exactly one index bit set, so exactly one group touched.</li>
+    <li><a href="https://youtu.be/b3NxrZOu_CE?t=283" target="_blank" rel="noopener">04:43</a> — XOR as parity, as addition mod 2, as vector addition over GF(2).</li>
+    <li><a href="https://youtu.be/b3NxrZOu_CE?t=344" target="_blank" rel="noopener">05:44</a> — Stack the on-positions and XOR the column: all four parities in one operation.</li>
+    <li><a href="https://youtu.be/b3NxrZOu_CE?t=439" target="_blank" rel="noopener">07:19</a> — Why the result <em>is</em> the address of the error, for 0→1 and 1→0 alike.</li>
+    <li><a href="https://youtu.be/b3NxrZOu_CE?t=502" target="_blank" rel="noopener">08:22</a> — The line of Python: <span class="mono">reduce(xor, [i for i, b in enumerate(bits) if b])</span>.</li>
+    <li><a href="https://youtu.be/b3NxrZOu_CE?t=631" target="_blank" rel="noopener">10:31</a> — What the line does <em>not</em> do: the meta parity bit, block sizing, burst errors, Reed–Solomon.</li>
+    <li><a href="https://youtu.be/b3NxrZOu_CE?t=728" target="_blank" rel="noopener">12:08</a> — One algorithm, multiple perspectives; Hamming's meandering path and Shannon down the hall.</li>
+  </ul>
+
+  <h2 id="address"><a href="https://youtu.be/b3NxrZOu_CE?t=31" target="_blank" rel="noopener">00:31</a> — The four answers were always an address</h2>
+
+  <p>Part 1 left you doing four parity checks and interpreting them as a sequence of yes/no questions that halve the search space: is the error in this half? in this quarter? The video's opening move is to stop reading them as questions and start reading them as <em>digits</em>. Write each check's answer as a bit — 1 for "this group has odd parity, something is wrong in here", 0 for "even, clean" — stack the four bits with the first check as the least significant, and the binary number you have written is the position of the flipped bit. Position 7 is <span class="mono">0111</span>, which is 4 + 2 + 1, and sure enough position 7 sits inside the first, second and third parity groups but not the fourth. Nothing is special about 7.</p>
+
+  <p>That single observation kills the entire "keep a candidate set and halve it" implementation you might otherwise have written. There is no bookkeeping, no interval, no loop over halves. You compute four parity bits, you concatenate them, and you index into the block. In hardware that is four XOR trees and a decoder; in software it is about to become one expression.</p>
+
+  <h2 id="labels"><a href="https://youtu.be/b3NxrZOu_CE?t=91" target="_blank" rel="noopener">01:31</a> — The parity groups were never arbitrary: they are the index bits</h2>
+
+  <p>Here is where the video stops asserting and starts explaining. Take the 16 slots and label them <span class="mono">0000</span> through <span class="mono">1111</span> in binary. These labels are not data — nothing about them is transmitted — they are the <em>addresses</em> of the slots, and they were implicit the whole time.</p>
+
+  <p>Now look only at the last bit of each label and highlight every slot where it is 1. Those slots are 1, 3, 5, 7, 9, 11, 13, 15 — which is precisely the first parity group from part 1 <a class="lnk" href="https://youtu.be/b3NxrZOu_CE?t=124" target="_blank" rel="noopener">(02:04)</a>. Look at the second-to-last bit and highlight: 2, 3, 6, 7, 10, 11, 14, 15 — the second group. Third bit: 4–7 and 12–15. Top bit: the whole upper half, 8–15. The four groups you were handed as a construction in part 1 are just the four "bit <span class="mono">k</span> of the address is on" sets.</p>
+
+  <p>Which reframes each check. Check <span class="mono">k</span> is no longer "is the error in this weird striped region"; it is the question <em>"if there is an error, is bit <span class="mono">k</span> of its address a 1?"</em> Four such questions, four bits, one address. Generalising is now mechanical: a block of <span class="mono">2ⁿ</span> slots has <span class="mono">n</span>-bit addresses, so it needs <span class="mono">n</span> parity groups — six for a 64-slot block <a class="lnk" href="https://youtu.be/b3NxrZOu_CE?t=189" target="_blank" rel="noopener">(03:09)</a>, twenty for a million.</p>
+
+  <p>It also explains the placement that looked like a lucky choice in part 1 <a class="lnk" href="https://youtu.be/b3NxrZOu_CE?t=220" target="_blank" rel="noopener">(03:40)</a>. The parity bits sit at positions 1, 2, 4, 8 because those are exactly the addresses with a single bit set. Position 4 is <span class="mono">0100</span>: it belongs to group 2 and to no other group. So the parity bit at position 4 is a control knob wired to syndrome bit 2 alone. Set it, and nothing else moves. That non-interference is what makes encoding a single pass rather than a system of equations to solve.</p>
+
+  <h2 id="xor"><a href="https://youtu.be/b3NxrZOu_CE?t=283" target="_blank" rel="noopener">04:43</a> — XOR computes every parity at once, and here is why</h2>
+
+  <p>XOR of two bits is 1 exactly when they differ, which is the same as saying it is their <em>parity</em>: the sum mod 2. Extend it to bit strings componentwise and you get addition with no carrying — vector addition in <span class="mono">(ℤ/2)ⁿ</span>, i.e. over the two-element field GF(2). The property that matters is that XOR-ing many strings together is column-wise parity of all of them at once <a class="lnk" href="https://youtu.be/b3NxrZOu_CE?t=313" target="_blank" rel="noopener">(05:13)</a>: column <span class="mono">k</span> of the result is 1 if and only if an odd number of the inputs had a 1 in column <span class="mono">k</span>.</p>
+
+  <p>Now the move <a class="lnk" href="https://youtu.be/b3NxrZOu_CE?t=344" target="_blank" rel="noopener">(05:44)</a>. Take the block, look at which slots hold a 1, write down the <em>addresses</em> of those slots in binary, and XOR the whole list together. Call the result the syndrome <span class="mono">S</span>:</p>
+
+<pre class="code-block"><code>S  =  ⊕  { i  :  bit at position i is 1 }        (⊕ = XOR, i written in binary)</code></pre>
+
+  <p>Claim: bit <span class="mono">k</span> of <span class="mono">S</span> is the parity of parity-group <span class="mono">k</span>. The proof is one line and it is worth doing rather than nodding at. By the column-wise property,</p>
+
+<pre class="code-block"><code>bit_k(S)  =  ⊕      bit_k(i)        (XOR over on-positions i)
+             i on
+
+          =  #{ i : bit i is on  AND  bit_k(i) = 1 }   mod 2
+
+          =  #{ on-bits in group k }  mod 2
+
+          =  parity of group k.</code></pre>
+
+  <p>Read that middle step slowly, because it is the whole lesson <a class="lnk" href="https://youtu.be/b3NxrZOu_CE?t=379" target="_blank" rel="noopener">(06:19)</a>. XOR-ing a column of bits is counting the 1s mod 2. The 1s in column <span class="mono">k</span> come from exactly those on-positions whose address has bit <span class="mono">k</span> set — and "positions whose address has bit <span class="mono">k</span> set" is the definition of group <span class="mono">k</span>. So the count is the number of on-bits in group <span class="mono">k</span>, and its parity is the group's parity check. The four checks are not <em>like</em> the XOR; they <em>are</em> the four bits of the XOR, computed simultaneously because the four groups are stored in four independent columns and XOR never carries between columns. No-carry is doing the load-bearing work: a carry would let group 0 contaminate group 1.</p>
+
+  <p>Two corollaries fall out immediately <a class="lnk" href="https://youtu.be/b3NxrZOu_CE?t=439" target="_blank" rel="noopener">(07:19)</a>. If a slot flips 0→1, its address joins the XOR, so <span class="mono">S</span> goes from <span class="mono">0</span> to that address. If a slot flips 1→0, its address <em>leaves</em> the XOR — but over GF(2) removing a term and adding it again are the same operation, since <span class="mono">x ⊕ x = 0</span> <a class="lnk" href="https://youtu.be/b3NxrZOu_CE?t=470" target="_blank" rel="noopener">(07:50)</a>. Either way the syndrome becomes the address of the corrupted slot. A clean block gives <span class="mono">0000</span>; any single error gives its own index, in binary, ready to use.</p>
+
+  <div class="callout"><b>Carry this:</b> the syndrome is not a <em>signal</em> that something is wrong from which you then deduce the location — it <em>is</em> the location, and "no error" is the location zero, which is why slot 0 must be excluded from the code proper. Everything else on this page is a consequence.</div>
+
+  <h2 id="worked">A block, worked end to end</h2>
+
+  <p>Let us do a real 16-slot block rather than gesture at one. Slots are numbered 0–15. Slot 0 is the whole-block parity bit (more on it below); slots 1, 2, 4, 8 are the four Hamming parity bits; the remaining eleven slots — 3, 5, 6, 7, 9, 10, 11, 12, 13, 14, 15 — carry the message. That is the extended Hamming(16, 11) code.</p>
+
+  <p><b>Step 1 — the message.</b> Suppose the eleven data slots, in order 3, 5, 6, 7, 9, 10, 11, 12, 13, 14, 15, carry <span class="mono">1 0 1 1 1 0 0 1 0 0 1</span>. So the data slots that are on are 3, 6, 7, 9, 12, 15.</p>
+
+  <p><b>Step 2 — the encoder runs the same XOR.</b> XOR those addresses:</p>
+
+<pre class="code-block"><code>3    0011
+6    0110   →  0101   (=5)
+7    0111   →  0010   (=2)
+9    1001   →  1011   (=11)
+12   1100   →  0111   (=7)
+15   1111   →  1000   (=8)
+
+data-only syndrome  S₀ = 8 = 1000</code></pre>
+
+  <p>The encoder wants the finished block to satisfy <span class="mono">S = 0</span>. Each parity bit at <span class="mono">2ᵏ</span> contributes exactly <span class="mono">2ᵏ</span> to the XOR when it is on, and contributes to no other bit of the syndrome — so the answer is simply <em>copy the bits of <span class="mono">S₀</span> into the parity slots</em>. Here <span class="mono">S₀ = 1000</span>, so slot 8 is set to 1 and slots 1, 2, 4 to 0. This is the encoder <a class="lnk" href="https://youtu.be/b3NxrZOu_CE?t=409" target="_blank" rel="noopener">(06:49)</a>: the decoder's operation, run once on the data alone, with the result written into the powers-of-two slots. Because those slots are the standard basis vectors of the syndrome space, the assignment is unique and order-free — there is no iteration and nothing to solve.</p>
+
+  <p><b>Step 3 — the overall parity bit.</b> The block now reads, slots 1 through 15: <span class="mono">0 0 1 0 0 1 1 1 1 0 0 1 0 0 1</span>. That is seven 1s, an odd count, so slot 0 is set to 1 to make the total even. Slot 0 has address <span class="mono">0000</span>, which contributes nothing to any XOR — which is precisely why the overall-parity bit can live there without disturbing the Hamming syndrome. The finished 16-bit block, slot 0 first:</p>
+
+<pre class="code-block"><code>slot   0  1  2  3  4  5  6  7  8  9 10 11 12 13 14 15
+bit    1  0  0  1  0  0  1  1  1  1  0  0  1  0  0  1
+role   P* p  p  d  p  d  d  d  p  d  d  d  d  d  d  d
+
+on-positions: 0, 3, 6, 7, 8, 9, 12, 15
+XOR:  0⊕3=3 ⊕6=5 ⊕7=2 ⊕8=10 ⊕9=3 ⊕12=15 ⊕15=0     →  S = 0000  ✓
+number of 1s = 8, even                              →  overall parity ✓</code></pre>
+
+  <p><b>Step 4 — corrupt it.</b> Flip slot 11 from 0 to 1. Now 11 joins the XOR, so <span class="mono">S = 0 ⊕ 11 = 1011</span>. The receiver reads 11, flips slot 11 back, and is done. The table checks the same thing the slow way, group by group, so you can see the two computations agree column for column:</p>
+
+  <table class="kv">
+    <tr><th>Group k</th><th>Positions in the group</th><th>On-bits, clean block</th><th>Parity</th><th>On-bits after flipping slot 11</th><th>Parity</th></tr>
+    <tr><td>0 (bit 1)</td><td>1,3,5,7,9,11,13,15</td><td>3, 7, 9, 15 — four</td><td>0</td><td>3, 7, 9, 11, 15 — five</td><td>1</td></tr>
+    <tr><td>1 (bit 2)</td><td>2,3,6,7,10,11,14,15</td><td>3, 6, 7, 15 — four</td><td>0</td><td>3, 6, 7, 11, 15 — five</td><td>1</td></tr>
+    <tr><td>2 (bit 4)</td><td>4–7, 12–15</td><td>6, 7, 12, 15 — four</td><td>0</td><td>6, 7, 12, 15 — four</td><td>0</td></tr>
+    <tr><td>3 (bit 8)</td><td>8–15</td><td>8, 9, 12, 15 — four</td><td>0</td><td>8, 9, 11, 12, 15 — five</td><td>1</td></tr>
+    <tr><td><b>Syndrome</b></td><td>bits read 3,2,1,0</td><td><b>0000 = 0</b></td><td>clean</td><td><b>1011 = 11</b></td><td>slot 11</td></tr>
+  </table>
+
+  <p>Both routes give 11. Flip a 1 instead — say slot 12 goes from 1 to 0 — and the syndrome is <span class="mono">1100 = 12</span>, again the right address, because dropping 12 from the XOR and adding it are the same act.</p>
+
+  <p><b>Step 5 — two errors, and what slot 0 buys.</b> Flip slots 11 <em>and</em> 12. The syndrome is <span class="mono">11 ⊕ 12 = 0111 = 7</span>: non-zero, and pointing confidently at slot 7, which is innocent. The bare Hamming code has no defence here. But count the 1s in the block: two flips changed the count by <span class="mono">+1 − 1 = 0</span>, so it is still even, and the overall-parity bit at slot 0 says "an even number of errors" <a class="lnk" href="https://youtu.be/b3NxrZOu_CE?t=631" target="_blank" rel="noopener">(10:31)</a>. Even count with a non-zero syndrome is a contradiction under the single-error hypothesis, so the receiver knows it is looking at a double error and refuses to "correct" slot 7. That is the whole extended code:</p>
+
+  <table class="kv">
+    <tr><th>Overall parity (slot 0)</th><th>Syndrome S</th><th>Verdict</th></tr>
+    <tr><td>even</td><td>0</td><td>clean block, accept</td></tr>
+    <tr><td>odd</td><td>non-zero</td><td>one error at address S, correct it</td></tr>
+    <tr><td>odd</td><td>0</td><td>slot 0 itself flipped, correct it</td></tr>
+    <tr><td>even</td><td>non-zero</td><td>two errors — detected, not correctable, request a resend</td></tr>
+  </table>
+
+  <p><em>My addition, not Grant's:</em> this is the standard SECDED behaviour — single error correction, double error detection. Hamming(15, 11) has minimum distance 3, so it corrects one error; adding the overall parity bit lifts the distance to 4, which buys detection of two. And the unextended code is <em>perfect</em> in the technical sense: <span class="mono">2¹¹ × (1 + 15) = 2¹¹ × 16 = 2¹⁵</span>, so the radius-1 balls around the codewords tile the space of 15-bit strings exactly, with nothing left over. Not one bit of the block is wasted.</p>
+
+  <h2 id="oneline"><a href="https://youtu.be/b3NxrZOu_CE?t=502" target="_blank" rel="noopener">08:22</a> — The line itself</h2>
+
+  <p>Written out, the decoder is this:</p>
+
+<pre class="code-block"><code>from functools import reduce
+from operator import xor
+
+syndrome = reduce(xor, [i for i, b in enumerate(bits) if b], 0)</code></pre>
+
+  <p>Read it right to left: <span class="mono">enumerate</span> pairs each slot with its index, <span class="mono">if b</span> keeps only the slots holding a 1, <span class="mono">i</span> takes their indices, and <span class="mono">reduce(xor, …)</span> folds the list into a single integer. In the video the random test block returns 9 <a class="lnk" href="https://youtu.be/b3NxrZOu_CE?t=569" target="_blank" rel="noopener">(09:29)</a>; a properly encoded block returns 0, and flipping any one bit makes it return that bit's index <a class="lnk" href="https://youtu.be/b3NxrZOu_CE?t=601" target="_blank" rel="noopener">(10:01)</a>. The <span class="mono">^</span> operator in Python is doing bitwise XOR on the machine words, which is exactly the column-wise parity argument above, four columns at a time in one instruction.</p>
+
+  <p>Three things about the line are worth naming. First, the initial value <span class="mono">0</span> matters: an all-zero block has no on-positions and must fold to 0, not raise. Second, nothing in it mentions 16 — the same line decodes 256 slots, or a million, with the register width being the only limit. Third, the encoder is the same line: run it over the data slots alone, then write the result's bits into slots 1, 2, 4, 8, …, as in step 2 above. Encoder and decoder differ only in what you do with the number that comes out.</p>
+
+  <p>What the line does <em>not</em> handle is the overall-parity bit, the detect-two-errors logic in the table above, and everything about choosing a block size. Bigger blocks are more efficient — 256 slots spend about 3% of themselves on redundancy, a million-bit block needs 21 parity bits and it is genuinely startling that 21 questions locate one flip among a million <a class="lnk" href="https://youtu.be/b3NxrZOu_CE?t=755" target="_blank" rel="noopener">(12:35)</a> — but efficiency is not the only axis. The probability of two or more flips in a block grows with the block, and Hamming handles exactly one <a class="lnk" href="https://youtu.be/b3NxrZOu_CE?t=788" target="_blank" rel="noopener">(13:08)</a>. Worse, real noise arrives in bursts, which is the pathological case: a burst puts several errors in one block and none in its neighbours. The standard fix is interleaving — write blocks into rows and transmit columns, so a contiguous burst is smeared one bit into each of many blocks. Beyond that you leave Hamming's regime for Reed–Solomon <a class="lnk" href="https://youtu.be/b3NxrZOu_CE?t=819" target="_blank" rel="noopener">(13:39)</a>, which is symbol- rather than bit-oriented, eats bursts naturally, and is tunable to any number of correctable errors per block.</p>
+
+  <h2 id="perspectives"><a href="https://youtu.be/b3NxrZOu_CE?t=728" target="_blank" rel="noopener">12:08</a> — One algorithm, four perspectives</h2>
+
+  <p>The closing chapter's real subject is not Hamming codes. It is that the same object now has four descriptions, and each one makes a different question easy. Keeping all four is the point.</p>
+
+  <table class="kv">
+    <tr><th>View</th><th>The object is…</th><th>What it makes easy</th></tr>
+    <tr><td>Parity groups</td><td>four overlapping subsets, each required to have an even number of 1s</td><td>Doing it by hand; wiring it directly in hardware as four XOR trees</td></tr>
+    <tr><td>Binary search</td><td>four yes/no questions, each halving the candidate set</td><td>The intuition for <em>cost</em>: locating one error among <span class="mono">2ⁿ</span> slots takes <span class="mono">n</span> bits, so redundancy grows like <span class="mono">log</span> of block size, not like the message</td></tr>
+    <tr><td>XOR of on-positions</td><td>one fold over the block, <span class="mono">S = ⊕ i</span></td><td>Software: one line, size-agnostic, and the encoder is the same line run backwards</td></tr>
+    <tr><td>Linear code over GF(2)</td><td>the null space of a parity-check matrix <span class="mono">H</span> whose <span class="mono">i</span>-th column is <span class="mono">i</span> in binary; <span class="mono">S = H·v</span></td><td>Proofs and generalisation: minimum distance, perfectness, and the doorway to BCH and Reed–Solomon</td></tr>
+  </table>
+
+  <p>The matrix view is worth pinning down, because Grant mentions it only to say it gives little intuition <a class="lnk" href="https://youtu.be/b3NxrZOu_CE?t=722" target="_blank" rel="noopener">(12:02)</a>, and he is right about intuition but it is the view under which the theorems get proved. <span class="mono">H</span> is the 4×15 matrix whose columns are the binary numerals 1 through 15. Multiplying it by the block vector <span class="mono">v</span> over GF(2) sums the columns where <span class="mono">v</span> is 1 — which is exactly XOR-ing the addresses of the on-bits. Codewords are the <span class="mono">v</span> with <span class="mono">H·v = 0</span>, an 11-dimensional subspace: 2¹¹ = 2048 valid blocks. Minimum distance 3 follows in a sentence, and it is a nice sentence: any two distinct columns of <span class="mono">H</span> are different and non-zero, so no two of them sum to zero, so no weight-2 vector is a codeword; hence no two codewords differ in fewer than 3 places. Every property of the code is a property of "the columns are all the non-zero 4-bit strings, each exactly once."</p>
+
+  <p>Grant's point about hardware versus software <a class="lnk" href="https://youtu.be/b3NxrZOu_CE?t=661" target="_blank" rel="noopener">(11:01)</a> generalises: the parity-group story is the one to teach and to etch into silicon, the XOR story is the one to type, the binary-search story is the one that tells you <em>why the cost is what it is</em>, and the matrix story is the one that scales to the codes people actually deploy. A perspective is not a restatement; it is a different set of cheap questions.</p>
+
+  <h2 id="close"><a href="https://youtu.be/b3NxrZOu_CE?t=943" target="_blank" rel="noopener">15:43</a> — Two questions from one 1948 paper</h2>
+
+  <p>Grant ends with Hamming's own account, in <em>The Art of Doing Science and Engineering</em>, of how meandering the discovery was: lattices, higher-dimensional arrangements, a lot of wrong turns, and only then the question "what is the most efficient I could conceivably be about this?" <a class="lnk" href="https://youtu.be/b3NxrZOu_CE?t=850" target="_blank" rel="noopener">(14:10)</a>. Parity checks happened to already be on his mind, which in the 1940s was not common.</p>
+
+  <blockquote class="q"><span>"There are like half a dozen times throughout this book that he references the Louis Pasteur quote, luck favors a prepared mind."</span><span class="cite">— Grant Sanderson, <a href="https://youtu.be/b3NxrZOu_CE?t=881" target="_blank" rel="noopener">14:41</a></span></blockquote>
+
+  <p>Hamming and Shannon shared an office at Bell Labs, and Shannon's <em>A Mathematical Theory of Communication</em> appeared in 1948, concurrent with this code. That is the right place to close this map, because the two halves of the site are two questions from that one paper. <b>How short can a message be made?</b> — answer: its entropy, <span class="mono">H(p) = Σ p(x)·log₂(1/p(x))</span> bits per symbol, and a compressor that reaches the bound leaves an output with no structure left to exploit, statistically a fair coin. <b>How much noise can a channel take?</b> — answer: the noisy-channel coding theorem, which says that below the channel capacity <em>arbitrarily reliable</em> transmission is possible, at a cost in rate but not in correctness. The first question says take redundancy out until there is none. The second says put a measured amount back, and tells you how little you can get away with.</p>
+
+  <p>Hamming codes are the concrete, hand-sized instance of the second answer: to point at one flipped bit among <span class="mono">2ⁿ</span> you need <span class="mono">n</span> bits of address, so you spend <span class="mono">n</span> bits and not one more <a class="lnk" href="https://youtu.be/b3NxrZOu_CE?t=691" target="_blank" rel="noopener">(11:31)</a>. Against the naive instinct — send the message three times — that is the difference between 200% overhead and 3%. Both are answers about the same currency, bits, measured the same way, in the same paper.</p>
+
+  <blockquote class="q"><span>"Ironically, the ideas that most profoundly shape the ways that a future generation thinks will end up looking to that future generation simpler than they really are."</span><span class="cite">— Grant Sanderson, <a href="https://youtu.be/b3NxrZOu_CE?t=973" target="_blank" rel="noopener">16:13</a></span></blockquote>
+
+  <h2 id="stuck">Where people get stuck</h2>
+
+  <p><b>"The XOR gives the position — but positions of what, bits or indices?"</b> This trips almost everyone the first time. You are not XOR-ing the <em>data</em>. You are XOR-ing the <em>index numbers</em> of the slots whose data happens to be 1. The data bits act only as a filter deciding which addresses enter the sum. A block of all 1s and a block of all 0s both have syndrome 0, for completely different reasons — the first because every address appears and they cancel in pairs across the full range, the second because the sum is empty.</p>
+
+  <p><b>"Why doesn't setting one parity bit break the other parity checks?"</b> Because the parity slots are at 1, 2, 4, 8, and those addresses have exactly one bit set each. In matrix language the four parity columns of <span class="mono">H</span> form the identity matrix, so the encoder is solving a system that is already diagonal. Put a parity bit at, say, slot 6 (<span class="mono">0110</span>) and it would sit in two groups at once, and you would genuinely have to solve equations. The powers of two are not an aesthetic choice; they are the choice that makes the system triangular.</p>
+
+  <p><b>"A syndrome of 0 means the block is fine."</b> It means the block is a codeword. Three errors can also land you on a valid codeword, or on the wrong one, and the code will cheerfully accept it. Hamming codes are guaranteed only within their distance: one error corrected, two detected (with the extension). Everything past that is undefined behaviour, which is why block sizing and interleaving are engineering decisions, not afterthoughts.</p>
+
+  <p><b>"Slot 0 seems like a wasted position."</b> It is unusable by the Hamming code proper — address <span class="mono">0000</span> contributes nothing to the syndrome, so a flip there is invisible to all four checks, and conversely syndrome 0 is already spoken for as "no error". That is exactly what makes it the right home for the overall-parity bit: it is the one slot whose state the syndrome cannot see, so it can carry independent information for free. The apparent waste is the extension's opportunity.</p>
+
+  <h2 id="further">Going deeper, verified</h2>
+  <ul class="readings">
+    <li><a href="https://youtu.be/X8jsijhllIA" target="_blank" rel="noopener">But what are Hamming codes? The origin of error correction</a> — 3Blue1Brown (2020) · Part 1, the hands-on derivation this video compresses; covered on <a class="lnk" href="p19.html">P19</a>.</li>
+    <li><a href="https://youtu.be/h0jloehRKas" target="_blank" rel="noopener">What is error correction? Hamming codes in hardware</a> — Ben Eater (2020) · The companion Grant links: the same scheme built on a breadboard, where the "four XOR trees" become actual wires.</li>
+    <li><a href="https://youtu.be/as7Gkm7Y7h4" target="_blank" rel="noopener">The almost impossible chessboard puzzle</a> — Stand-up Maths with Matt Parker and Grant Sanderson (2019) · The same index-XOR logic solving a different problem on 64 squares; the best exercise in the identity "syndrome = address".</li>
+    <li><a href="https://doi.org/10.1002/j.1538-7305.1950.tb00463.x" target="_blank" rel="noopener">Error Detecting and Error Correcting Codes</a> — R. W. Hamming, <em>Bell System Technical Journal</em> 29(2), 147–160 (1950) · The original. Short, readable, and already framed in terms of distance rather than tricks.</li>
+    <li><a href="https://people.math.harvard.edu/~ctm/home/text/others/shannon/entropy/entropy.pdf" target="_blank" rel="noopener">A Mathematical Theory of Communication</a> — C. E. Shannon (1948) · The paper both halves of this map descend from: entropy as the compression floor, capacity as the noise ceiling.</li>
+    <li><a href="https://press.stripe.com/the-art-of-doing-science-and-engineering" target="_blank" rel="noopener">The Art of Doing Science and Engineering</a> — Richard Hamming (1997; Stripe Press edition) · Chapter 12 is Hamming's own account of the discovery, wrong turns included.</li>
+  </ul>
+
+  <h2 id="exercises">Exercises</h2>
+  <ol class="exercises">
+    <li><b>Encode a block by hand, then break it</b> — Take the eleven data bits <span class="mono">1 1 0 0 1 0 1 1 0 1 0</span> into slots 3, 5, 6, 7, 9, 10, 11, 12, 13, 14, 15. XOR the on-addresses to get <span class="mono">S₀</span>, write its bits into slots 1, 2, 4, 8, set slot 0 for even overall parity, and verify the full block XORs to 0. Then flip one slot of your choosing and confirm the syndrome is its index. A good answer states <span class="mono">S₀</span> explicitly and shows the group-by-group parity table agreeing with the XOR, as in the worked example above.</li>
+    <li><b>Write the encoder as one line too</b> — The video gives the decoder as a single <span class="mono">reduce</span>. Write the matching encoder in the same spirit: a function taking 11 data bits and returning a 16-bit list, using the same fold. Then write a loop that, for all 2¹¹ = 2048 messages and all 16 single-bit flip positions, checks that the decoder recovers the flipped index — 32,768 cases, and all of them should pass. Extend it to all 120 two-bit flip pairs per codeword and confirm every one is <em>detected</em> (even overall parity, non-zero syndrome) and none is silently mis-corrected.</li>
+    <li><b>Price the redundancy</b> — For block sizes 2ⁿ with n = 4, 8, 12, 20, compute the number of parity bits (n plus one for the extension), the number of data bits, and the overhead as a percentage. Compare each against the naive triple-repetition code (200% overhead, corrects one error per triple). Then compute, for a per-bit flip probability of 10⁻⁶, the probability that a block of each size contains two or more flips — <span class="mono">1 − (1−p)ᴺ − N·p·(1−p)ᴺ⁻¹</span> — and say which block size you would actually ship, and why the answer is not "the biggest one".</li>
+  </ol>
+
+  <div class="callout">Previous: <a class="lnk" href="p19.html">P19 Reinventing Hamming codes</a> · This is the end of the map — there is no next page. Go back to <a class="lnk" href="../index.html#refs">the sources</a>, or to <a class="lnk" href="../index.html">the field map</a> to pick up another thread.</div>
+</main>
+<footer>Original explanation of 3Blue1Brown's Hamming codes part 2: The one-line implementation. The lesson and animations are Grant Sanderson's; this page links to them, it does not copy them.</footer>
+</body>
+</html>

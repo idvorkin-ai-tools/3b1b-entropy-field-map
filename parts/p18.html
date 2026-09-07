@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>P18 The bug: when the objective you optimise is not the one you meant — Entropy, mapped</title>
+<meta name="description" content="A one-letter shortcut in Grant's Wordle colouring code changed which opener scored best. The method survived; the number didn't. How to catch this class of bug." />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="../paper.css" />
+</head>
+<body>
+<header class="bar"><div class="bar-in">
+  <div class="brand"><span class="dot"></span>ENTROPY&nbsp;//&nbsp;FIELD&nbsp;MAP</div>
+  <a class="back" href="../index.html#wordle">← field map</a>
+</div></header>
+<main>
+  <div class="eyebrow"><span class="box wb mono">P18 · ENTROPY IN ACTION</span><span class="mono">3Blue1Brown · 00:00–10:52 · 11 min</span></div>
+  <h1>The bug: when the objective you optimise is not the one you meant</h1>
+  <div class="authors">The whole of the Wordle addendum — the correction video Grant posted a week after the main one, retracting a number and keeping the method.</div>
+  <div class="paperlink" style="border-left-color:var(--off)"><span class="lbl">Watch</span><a href="https://youtu.be/fRed0Xmc2Wg?t=0" target="_blank" rel="noopener">Oh, wait, actually the best Wordle opener is not “crane”… — 3Blue1Brown, from 00:00 ↗</a></div>
+  <p class="mono" style="font-size:12.5px;color:var(--ink-dim)">Transcript: <a class="lnk" href="../transcripts/wordle-addendum.html#s-0">this stretch, timestamped</a></p>
+
+  <div class="tldr"><b>TL;DR —</b> The code that reproduced Wordle's colouring used a shortcut for repeated letters: tag the <span class="mono">k</span>-th copy of a letter as a distinct symbol, then colour each square independently. That rule asks "does the answer contain a <span class="mono">k</span>-th copy of this letter?" where Wordle asks "is there a copy <em>left</em> after the greens have taken theirs?" The two agree almost always and disagree in one specific shape — a green sitting to the right of a non-green duplicate — which paints a grey square yellow. Measured on the video's own word lists, that is 2.1% of guess/answer pairs, every error in the same direction, and it quietly understated the information content of every guess with a repeated letter. The entropy formulas, the bucket picture and the two-step search were all correct; the environment they were run against was not, and so the reported winner changed. The thing to carry: an optimiser's answer is a claim about your <em>simulator</em>, and only becomes a claim about the world to the extent that the simulator is right.</div>
+
+  <p class="lead">The previous page walked through the machinery: word frequencies as a prior, expected information as a one-step heuristic, an exhaustive two-step search when one step isn't enough, and the honest admission that "optimal" is defined relative to a word list and an objective. This page is what happened next. A week after that video went up, Grant posted an addendum: the pattern function at the very bottom of the stack — the piece of code that says which squares turn grey, yellow and green — did not match Wordle in a small class of cases involving repeated letters. Everything above it inherited the error. Nothing about entropy changed; the ranking of openers did. It is the most quietly instructive ten minutes in the series, because the failure mode is the one that actually bites people in machine learning: not a wrong formula, but a right formula evaluated against a subtly wrong world.</p>
+
+  <h2 id="outline">Outline, with timestamps</h2>
+  <ul class="outline">
+    <li><a href="https://youtu.be/fRed0Xmc2Wg?t=0" target="_blank" rel="noopener">00:00</a> — The confession: a bug in the code that recreated Wordle, affecting a small percentage of cases.</li>
+    <li><a href="https://youtu.be/fRed0Xmc2Wg?t=31" target="_blank" rel="noopener">00:31</a> — The rule it got wrong: how Wordle colours a guess with two of the same letter (SPEED against ABIDE, then against ERASE).</li>
+    <li><a href="https://youtu.be/fRed0Xmc2Wg?t=92" target="_blank" rel="noopener">01:32</a> — Where it came from: a mid-project attempt to speed up the pattern computation — and the irony that the real speed-up was to precompute everything anyway.</li>
+    <li><a href="https://youtu.be/fRed0Xmc2Wg?t=122" target="_blank" rel="noopener">02:02</a> — What survives: the lessons about information and entropy are untouched; some on-screen distributions are slightly off.</li>
+    <li><a href="https://youtu.be/fRed0Xmc2Wg?t=155" target="_blank" rel="noopener">02:35</a> — What doesn't: the headline claim that CRANE was the best opener was true of a slightly different game.</li>
+    <li><a href="https://youtu.be/fRed0Xmc2Wg?t=215" target="_blank" rel="noopener">03:35</a> — Deliberate overfitting: for a pure best-score search, drop the frequency prior and take the official answer list as known and uniform.</li>
+    <li><a href="https://youtu.be/fRed0Xmc2Wg?t=307" target="_blank" rel="noopener">05:07</a> — Objective 1, one-step expected information: the winner is SOARE.</li>
+    <li><a href="https://youtu.be/fRed0Xmc2Wg?t=403" target="_blank" rel="noopener">06:43</a> — Objective 2, two-step expected information: SOARE drops to 14th and SLANE rises to the top.</li>
+    <li><a href="https://youtu.be/fRed0Xmc2Wg?t=470" target="_blank" rel="noopener">07:50</a> — Objective 3, actual simulated score over every answer: SALET wins by a hair, with TRACE and CRATE effectively tied and both real answers.</li>
+    <li><a href="https://youtu.be/fRed0Xmc2Wg?t=566" target="_blank" rel="noopener">09:26</a> — Why none of this is advice: change the word list and it evaporates; remember the greedy-versus-deeper-search lesson instead.</li>
+  </ul>
+
+  <h2 id="rule">Wordle's colouring rule is a matching, not a per-letter test <a class="lnk" href="https://youtu.be/fRed0Xmc2Wg?t=31" target="_blank" rel="noopener">00:31</a></h2>
+
+  <p>Start with the thing that has to be got exactly right. Colouring a guess against an answer looks like five independent questions — is this letter here, is it somewhere, is it nowhere — and it is not. It is a two-pass assignment in which each letter of the <em>answer</em> can be used up at most once:</p>
+
+<pre class="code-block">pass 1 (greens):  for each position i
+                      if guess[i] == answer[i]:
+                          colour[i] = GREEN
+                          strike out answer[i] and guess[i]
+
+pass 2 (yellows): for each surviving position i, left to right
+                      if some surviving answer letter equals guess[i]:
+                          colour[i] = YELLOW
+                          strike out that answer letter and guess[i]
+                      else:
+                          colour[i] = GREY</pre>
+
+  <p>The striking-out is the whole content of the rule. Grant's two examples make it concrete. Guess SPEED against answer ABIDE: ABIDE holds exactly one E, the greens take nothing, so the first E of the guess claims it and turns yellow, and the second E finds the cupboard bare and turns grey — the greyness is a positive statement, "there is no second E". Guess SPEED against ERASE: now the answer holds two Es, so both of the guess's Es go yellow. Same guess, same letters, different colours, because the count in the answer is what is being rationed.</p>
+
+  <p>Read structurally, the rule is a maximum matching between guess positions and answer positions that share a letter, with positional matches given absolute priority and the rest filled greedily left to right. That is a slightly awkward thing to vectorise over thirteen thousand words squared, which is exactly why it got shortcut.</p>
+
+  <h2 id="bug">The bug, exactly <a class="lnk" href="https://youtu.be/fRed0Xmc2Wg?t=92" target="_blank" rel="noopener">01:32</a></h2>
+
+  <p>The shortcut is legible in the code repository for the video, and it is genuinely clever, which is why it survived. Instead of tracking consumption, relabel the letters so that duplicates are different symbols: the first E of a word stays <span class="mono">e</span>, the second E becomes <span class="mono">e+26</span>, the third <span class="mono">e+52</span>. Do that to both the guess and the answer, and then every square can be coloured independently, with no bookkeeping at all:</p>
+
+<pre class="code-block"># the relabelling: the k-th copy of a letter gets an offset of 26·k
+for i in range(n):
+    for j in range(i):
+        arr[:, i] += (arr[:, i] == arr[:, j]) * 26
+
+# then, per square, with no state carried between positions:
+if   guess[i] % 26 == answer[i] % 26:   colour = GREEN    # same base letter, same slot
+elif guess[i] in answer:                colour = YELLOW   # tagged: "is there a k-th copy?"
+else:                                   colour = GREY</pre>
+
+  <p>The <span class="mono">% 26</span> in the green test strips the tag, so greens are correct. The yellow test does <em>not</em> strip it, and that is the point of the trick: the guess's second E is yellow only if the answer also has a second E. Run Grant's two narrated examples through it and both come out right. SPEED/ABIDE: the guess's Es are tagged <span class="mono">e</span> and <span class="mono">e+26</span>, ABIDE offers only <span class="mono">e</span>, so yellow then grey. SPEED/ERASE: ERASE offers <span class="mono">e</span> and <span class="mono">e+26</span>, so yellow and yellow. The shortcut passes every test a person would write by hand in thirty seconds.</p>
+
+  <p>Here is what it actually computes. For a letter <span class="mono">c</span> occurring <span class="mono">A</span> times in the answer, the buggy rule paints the guess's <span class="mono">k</span>-th copy of <span class="mono">c</span> yellow whenever <span class="mono">k ≤ A</span>, counting <span class="mono">k</span> in <em>guess order</em>. Wordle paints the <span class="mono">r</span>-th <em>non-green</em> copy yellow whenever <span class="mono">r ≤ A − G</span>, where <span class="mono">G</span> is how many of the guess's copies came up green. The tag scheme has no idea that greens have already spent some of the answer's supply. So the two rules part company in exactly one shape: <b>a green copy of a letter sitting to the right of a non-green copy of the same letter.</b></p>
+
+  <p>Four cases, writing <span class="mono">·</span> for grey, <span class="mono">Y</span> for yellow and <span class="mono">G</span> for green. Every word below is on the official answer list, so you can check any row in the browser:</p>
+
+  <table class="kv">
+    <tr><th>guess</th><th>answer</th><th>Wordle</th><th>the shortcut</th><th></th></tr>
+    <tr><td>SPEED</td><td>ABIDE</td><td><span class="mono">· · Y · Y</span></td><td><span class="mono">· · Y · Y</span></td><td>agrees</td></tr>
+    <tr><td>SPEED</td><td>ERASE</td><td><span class="mono">Y · Y Y ·</span></td><td><span class="mono">Y · Y Y ·</span></td><td>agrees</td></tr>
+    <tr><td>ARRAY</td><td>AGREE</td><td><span class="mono">G · G · ·</span></td><td><span class="mono">G Y G · ·</span></td><td><b>differs</b></td></tr>
+    <tr><td>GEESE</td><td>ABIDE</td><td><span class="mono">· · · · G</span></td><td><span class="mono">· Y · · G</span></td><td><b>differs</b></td></tr>
+  </table>
+
+  <p>Take ARRAY against AGREE. The second R of the guess lands on the R of AGREE and goes green, consuming the answer's only R; Wordle therefore greys the first R. The shortcut asks a different question of that first R — "is there a first R in the answer?" — gets yes, and paints it yellow. The player is told the word contains another R somewhere else. It does not.</p>
+
+  <div class="callout"><b>The error has a sign.</b> Every disagreement is grey-in-Wordle, yellow-in-the-simulator; the shortcut can never lose a yellow. One line of argument: if the <span class="mono">r</span>-th non-green copy is a true yellow then <span class="mono">r ≤ A − G</span>, and its guess-order index is <span class="mono">k = r + g</span> where <span class="mono">g ≤ G</span> is the number of greens to its left, so <span class="mono">k ≤ A − G + g ≤ A</span> and the shortcut calls it yellow too. The inequality is strict — and the two rules differ — precisely when <span class="mono">g &lt; G</span>, i.e. when some green sits to the right. <i>(Argument and the measurement below are mine, not the video's; I checked the claim exhaustively against the repository's word lists and found no exception in 636,483 mis-coloured squares.)</i></div>
+
+  <h2 id="scale">How big was it, in numbers</h2>
+
+  <p>The video says "a very small percentage of cases" and leaves it there. It is worth putting a number on, because the size of the effect is the whole lesson. Re-implementing both the correct rule and the shortcut and running them over every pair of words in the lists checked into the video's repository — 12,953 allowed guesses × 2,309 answers, 29.9 million pairs — gives this. <b>These are my measurements</b>, on the lists as they stand in the repo today; Grant quotes 2,315 answers and "13,000" guesses <a class="lnk" href="https://youtu.be/fRed0Xmc2Wg?t=437" target="_blank" rel="noopener">07:17</a>, so expect the last digit to move if you use the original lists.</p>
+
+  <table class="kv">
+    <tr><th>quantity</th><th>value</th></tr>
+    <tr><td>guess/answer pairs coloured differently</td><td>633,137 of 29,908,477 — <b>2.12%</b></td></tr>
+    <tr><td>individual squares mis-coloured</td><td>636,483, of which grey→yellow</td></tr>
+    <tr><td>… of which any other kind of error</td><td><b>0</b></td></tr>
+    <tr><td>guesses affected for at least one answer</td><td>4,639 — exactly the guesses with a repeated letter</td></tr>
+    <tr><td>… whose expected information changed</td><td>4,444 lower, 0 higher, 195 unchanged</td></tr>
+    <tr><td>mean shift in expected information</td><td>−0.032 bits (worst: COOEE, 4.245 → 4.091)</td></tr>
+    <tr><td>top ten openers by one-step information</td><td>identical under both rules — none has a repeated letter</td></tr>
+  </table>
+
+  <p>That last row is the surprising one and it sharpens what actually went wrong. The bug cannot touch a guess with five distinct letters, so it cannot touch the one-step entropy of SOARE, SLANE, SALET, CRATE, TRACE or CRANE. The damage arrives one level up. The two-step search evaluates thousands of <em>second</em> guesses, many of which repeat letters, and it systematically undervalued every one of them — never by much, always downwards. The full-game simulation is worse off still: there the wrong pattern function doesn't just misprice a candidate, it hands the solver a wrong posterior, so the simulated game diverges from the real one move by move. The average score that came out was an honest measurement of a game that is not Wordle.</p>
+
+  <h2 id="tight">Why 2% was enough to flip the answer <a class="lnk" href="https://youtu.be/fRed0Xmc2Wg?t=437" target="_blank" rel="noopener">07:17</a></h2>
+
+  <p>Because the quantity being optimised is a mean over 2,315 games, and the contenders are separated by less than a hundredth of a guess. Grant says as much when the leaderboard appears — it is "a really tight race among all of these top contenders". A ranking is a discrete output of a continuous computation, and its sensitivity to error is governed not by the error's size but by the gaps between the things being ranked. When the top ten differ in the third decimal place, a systematic perturbation in the third decimal place reorders them. This is the same reason a 0.2-point benchmark delta between two models is not evidence of anything.</p>
+
+  <p>Note also that the error is <em>systematic</em>, not noise. Noise of the same magnitude would mostly cancel across 2,315 games; a bias that always points the same way does not. Every repeated-letter guess was marked down by roughly the same amount, so the whole comparison was tilted rather than blurred, and no amount of averaging recovers the truth.</p>
+
+  <h2 id="openers">What this video reports as the best openers <a class="lnk" href="https://youtu.be/fRed0Xmc2Wg?t=307" target="_blank" rel="noopener">05:07</a></h2>
+
+  <p>The second half of the video is the analysis that never got shown the first time: three different objectives, three different winners. All three assume something the earlier video deliberately refused — the official answer list, taken as known, with uniform probability over its members. Grant is explicit that this is cheating and that he is doing it on purpose:</p>
+
+  <blockquote class="q"><span>"To my taste that feels a bit like overfitting to a test set, and what's more fun is building something that's resilient."</span><span class="cite">— Grant Sanderson, <a href="https://youtu.be/fRed0Xmc2Wg?t=215" target="_blank" rel="noopener">03:35</a></span></blockquote>
+
+  <p>With a known uniform answer list the whole probability computation collapses into counting: for a candidate opener, sort the 2,315 answers into the 3⁵ = 243 pattern buckets, and the probability of a pattern is just its bucket's share <a class="lnk" href="https://youtu.be/fRed0Xmc2Wg?t=276" target="_blank" rel="noopener">04:36</a>. Then the three objectives, in increasing order of how much work they cost and how close they get to the thing you actually want:</p>
+
+  <table class="kv">
+    <tr><th>objective</th><th>what it computes</th><th>winner in this video</th><th>H₁, recomputed</th></tr>
+    <tr><td>one-step information</td><td><span class="mono">E[I] = Σ p(pattern)·log₂(1/p(pattern))</span> over the 243 buckets</td><td><b>SOARE</b> <a class="lnk" href="https://youtu.be/fRed0Xmc2Wg?t=307" target="_blank" rel="noopener">05:07</a></td><td>5.885 bits</td></tr>
+    <tr><td>two-step information</td><td>that, plus the bucket-weighted average of the best second guess's information in each bucket</td><td><b>SLANE</b> <a class="lnk" href="https://youtu.be/fRed0Xmc2Wg?t=403" target="_blank" rel="noopener">06:43</a> (SOARE falls to 14th)</td><td>5.769 bits</td></tr>
+    <tr><td>lowest average score</td><td>play all 2,315 games with the full solver; average the number of guesses</td><td><b>SALET</b> <a class="lnk" href="https://youtu.be/fRed0Xmc2Wg?t=470" target="_blank" rel="noopener">07:50</a>, with TRACE and CRATE all but tied</td><td>5.836 / 5.830 / 5.835 bits</td></tr>
+  </table>
+
+  <p>The H₁ column is my own recomputation of one-step expected information under the corrected rule, uniform over the repository's 2,309 answers — included so you can see how little separates these words, and that the ordering by information is not the ordering by score. CRANE, the word from the original video's thumbnail, comes out 32nd on that metric at 5.741 bits; it was never the information winner, it was the winner of the simulated-score contest in the buggy game. SOARE is an obsolete term for a young hawk; SLANE is a turf-cutting spade; SALET is a variant spelling of <em>sallet</em>, a light medieval helmet. Grant's own reaction to the last one is that it feels too fake to use, which is why he points at TRACE and CRATE — near-identical performance, real words, and both on the answer list, so they can win outright on the first guess <a class="lnk" href="https://youtu.be/fRed0Xmc2Wg?t=470" target="_blank" rel="noopener">07:50</a>.</p>
+
+  <p>Say the caveat out loud, because it is the shape of the whole page: these are the winners <em>this video reports</em>, for <em>this word list</em>, under <em>these objectives</em>, with a solver of <em>this</em> depth. Grant closes by noting that if the list changes underneath — the New York Times had just bought the game — the entire result evaporates <a class="lnk" href="https://youtu.be/fRed0Xmc2Wg?t=566" target="_blank" rel="noopener">09:26</a>. "Optimal" was never a property of the English language.</p>
+
+  <h2 id="lesson">The general lesson: an optimiser reports on your simulator <a class="lnk" href="https://youtu.be/fRed0Xmc2Wg?t=122" target="_blank" rel="noopener">02:02</a></h2>
+
+  <p>Nothing about information theory was implicated. <span class="mono">H(p) = Σ p(x)·log₂(1/p(x))</span> was correct; the reading of it as "how many times do you expect to halve your space of possibilities" was correct; the bucket picture, the greedy-versus-two-step comparison, the observation that expected information is a heuristic for score rather than score itself — all correct. What was wrong sat strictly below all of it, in the function that maps (guess, answer) to an observation. The optimiser did its job perfectly on the model it was given.</p>
+
+  <p>That is the failure mode worth internalising, because it is endemic in machine learning and it never announces itself. A leaked test set, an evaluation harness that strips whitespace differently from the scorer, an off-by-one between tokens and labels, a reward model that scores fluency when you meant correctness, a replay buffer whose environment dynamics drift from the deployed ones — each produces numbers that are precise, reproducible, internally consistent, and about the wrong universe. The optimiser's confidence is not evidence: a stronger optimiser applied to a mis-specified objective gets you a <em>more</em> confidently wrong answer, faster.</p>
+
+  <p>There is a sharp connection to the scoring-rule material on <a class="lnk" href="p13.html">P13</a>. Cross-entropy is a <em>proper</em> scoring rule: it is uniquely minimised by reporting your true beliefs, which is what licenses training against it. But propriety is a statement about a pair — the score and the distribution you evaluate it against. <span class="mono">H(p, q)</span> is minimised at <span class="mono">q = p</span> for the <span class="mono">p</span> that actually generates your data, and if your data-generating process is a simulator with a bug, then the <span class="mono">p</span> in that guarantee is the simulator's distribution and not the world's. Minimising a proper score against the wrong <span class="mono">p</span> converges beautifully to the wrong beliefs. Propriety buys you honesty about your model; it buys you nothing about the measurement apparatus.</p>
+
+  <h2 id="catch">How would you have caught this</h2>
+
+  <p>Concretely, in rough order of cost:</p>
+
+  <p><b>Unit-test the pattern function on the duplicate-letter cases, including the one nobody thinks of.</b> The natural hand-written tests are exactly SPEED/ABIDE and SPEED/ERASE — and, as the table above shows, the shortcut passes both. The case that fails is the third one, where a duplicate goes green in a later position than a non-green copy: ARRAY/AGREE, GEESE/ABIDE, SEVER/OLDER. Enumerating the shapes rather than the examples is what saves you here: (guess repeats a letter) × (answer has 0, 1, 2 copies) × (the green is on the first copy / a later copy / no green). That grid has a dozen cells and one of them is the bug.</p>
+
+  <p><b>Differential-test the fast version against a slow, obviously-correct one.</b> This is the highest-value practice in the list and it costs almost nothing. Write the two-pass rule the boring way, in a loop, with a list you strike letters out of. Then run both over every pair of words — 30 million pairs takes under a minute in NumPy — and assert equality. Every number on this page came out of exactly that exercise. Whenever you replace a readable implementation with an optimised one, keep the readable one and make it the oracle; the whole reason to trust the fast path is that the slow path exists.</p>
+
+  <p><b>Assert invariants that don't require an oracle.</b> Property-based testing catches this class without you knowing what the bug is. For any guess and answer: colouring a word against itself must be all green; the number of green-plus-yellow squares for a letter <span class="mono">c</span> can never exceed the number of copies of <span class="mono">c</span> in the answer (this single property fails on ARRAY/AGREE, and is the bug); and the self-consistency check that matters most — <em>the answer must always survive its own pattern</em>, i.e. filtering the word list by <span class="mono">pattern(guess, answer)</span> must always leave the answer in the list. That last one is cheap, requires no reference implementation, and is violated the moment your filter and your colourer disagree.</p>
+
+  <p><b>Check against the real game, not just against your intuition.</b> Play a handful of hands in the browser with deliberately duplicate-heavy guesses and diff the colours. Ten minutes, and it is the only test that validates your reading of the specification rather than your implementation of your reading.</p>
+
+  <p><b>Sanity-check that conclusions are stable under re-implementation.</b> If a result is the headline — "the best opener is X" — re-derive it a second way before publishing. A second implementation of the pattern function, or a comparison against someone else's published solver, would have shown a disagreement immediately. Results that hinge on the third decimal place deserve this treatment as a matter of routine; results separated by a wide margin usually do not.</p>
+
+  <p><b>Invalidate your caches.</b> A trap specific to this design and to a great deal of ML tooling: the pattern function's output is precomputed once into a matrix on disk and thereafter only looked up. Fix the source and the stale artefact silently outlives the bug. Any cached derived artefact wants a key that includes a hash of the code that produced it — otherwise your fix ships and your numbers don't change, which is a worse failure than the original.</p>
+
+  <h2 id="stuck">Where people get stuck</h2>
+
+  <p><b>"So Wordle's rule is just per-letter presence?"</b> No, and this is the misconception the bug is made of. Presence is a property of the letter; the colouring rations <em>copies</em>. The clean mental model is a supply-and-demand ledger: the answer supplies some number of each letter, greens are served first with absolute priority, and the leftovers are handed to non-green positions from left to right. Grey means "no copy left for you", not "this letter does not occur".</p>
+
+  <p><b>"If the pattern function was wrong, weren't the entropies wrong too?"</b> Only for guesses that repeat a letter — 4,639 of the 12,953 allowed words, and none of the top openers. The reason the published conclusion moved anyway is that the two-step search and the score simulation both consult the pattern function thousands of times per candidate, on words that do repeat letters. The moral is that a bug's blast radius is set by how many layers sit on top of it, not by how often it fires.</p>
+
+  <p><b>"Which of SOARE, SLANE and SALET is <em>the</em> answer?"</b> The question is malformed until you name an objective. They are winners of three different competitions — most expected information after one guess, after two, and lowest average number of guesses in full simulated play. The three disagree because expected information is a proxy for score and proxies are not the thing. That gap is itself the most transferable idea in the video: greedy optimisation of a one-step heuristic is not global optimisation, and the honest way to find out how big the gap is, is to run the real objective.</p>
+
+  <p><b>"The captions spell it 'soar' and 'salé'."</b> The words are <span class="mono">soare</span>, <span class="mono">slane</span> and <span class="mono">salet</span> — all five letters, all present in the allowed-guess list checked into the video's code repository, which is the check to run when a caption spells an unfamiliar word by ear.</p>
+
+  <h2 id="further">Going deeper, verified</h2>
+  <ul class="readings">
+    <li><a href="https://github.com/3b1b/videos/commit/5207353ad38cd9ddfd62aaaaa471fd29c198f6e9" target="_blank" rel="noopener">"Reorganize, fix lingering color pattern bug"</a> — 3b1b/videos, commit of 8 February 2022 · the actual fix; the new version builds an explicit letter-equality grid and strikes out both the guess letter and the answer letter on every match.</li>
+    <li><a href="https://github.com/3b1b/videos/tree/master/_2022/wordle" target="_blank" rel="noopener">Code for the Wordle videos</a> — Grant Sanderson (2022) · <span class="mono">simulations.py</span> holds the corrected <span class="mono">generate_pattern_matrix</span>, the entropy calculations and the full-game simulator; the word lists are in <span class="mono">data/</span>.</li>
+    <li><a href="https://jonathanolson.net/experiments/optimal-wordle-solutions" target="_blank" rel="noopener">Optimal Wordle Solutions</a> — Jonathan Olson (2022) · linked by Grant in the description; exact optimal strategies by exhaustive search, with an interactive tree of best follow-up guesses.</li>
+    <li><a href="http://sonorouschocolate.com/notes/index.php?title=The_best_strategies_for_Wordle" target="_blank" rel="noopener">The best strategies for Wordle</a> — Alex Selby (2022) · also linked by Grant; a proof-grade treatment with branch-and-bound, including the exact optimal average score and hard-mode variants.</li>
+    <li><a href="https://hypothesis.readthedocs.io/en/latest/" target="_blank" rel="noopener">Hypothesis documentation</a> — property-based testing for Python · the tooling for the invariants in the section above; generating random word pairs and asserting "the answer survives its own pattern" finds this bug in seconds.</li>
+  </ul>
+
+  <h2 id="exercises">Exercises</h2>
+  <ol class="exercises">
+    <li><b>Write both colourers and diff them</b> — implement the two-pass rule with explicit striking-out, and the tag-by-26 shortcut. Run both over the word lists from the repository and report the number of disagreeing pairs. A good answer gets a figure near 2% of pairs, notes that the affected guesses are exactly those with a repeated letter, and — the real prize — verifies the direction claim: every mis-coloured square is grey in Wordle and yellow in the shortcut, no exceptions.</li>
+    <li><b>Price the bug in bits</b> — for one repeated-letter guess, say COOEE, compute the 243-bucket distribution over the answer list under both rules and evaluate <span class="mono">E[I] = Σ p·log₂(1/p)</span> for each. A good answer reports both numbers (mine: 4.245 bits correct, 4.091 buggy) and explains the sign: the spurious yellows merge answers that Wordle would have separated more often than they split ones it would have joined, so the guess looks flatter and less informative than it is.</li>
+    <li><b>Find the smallest failing case by hand</b> — without running any code, construct a guess and an answer, both real English words, where the shortcut and Wordle disagree, and justify it from the rule <span class="mono">k ≤ A</span> versus <span class="mono">r ≤ A − G</span>. A good answer names the required shape — a repeated letter whose later copy is green and whose earlier copy has no supply left — and gives a pair such as ARRAY/AGREE, together with the two colourings and which square differs.</li>
+  </ol>
+
+  <div class="callout">Previous: <a class="lnk" href="p17.html">P17 Priors, two-step search, and what "optimal" actually means</a> · Next: <a class="lnk" href="p19.html">P19 Reinventing Hamming codes</a> · Back to the <a class="lnk" href="../index.html#wordle">map</a>.</div>
+</main>
+<footer>Original explanation of 3Blue1Brown's "Oh, wait, actually the best Wordle opener is not “crane”…". The lesson and animations are Grant Sanderson's; this page links to them, it does not copy them.</footer>
+</body>
+</html>
