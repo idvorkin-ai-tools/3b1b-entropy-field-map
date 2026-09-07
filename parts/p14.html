@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>P14 Distillation: training on a distribution instead of an answer — Entropy, mapped</title>
+<meta name="description" content="Knowledge distillation is cross-entropy with the teacher's full distribution in the p slot instead of a one-hot sample — richer signal per example, and a hard ceiling." />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="../paper.css" />
+</head>
+<body>
+<header class="bar"><div class="bar-in">
+  <div class="brand"><span class="dot"></span>ENTROPY&nbsp;//&nbsp;FIELD&nbsp;MAP</div>
+  <a class="back" href="../index.html#cross-entropy">← field map</a>
+</div></header>
+<main>
+  <div class="eyebrow"><span class="box bb mono">P14 · CROSS-ENTROPY</span><span class="mono">3Blue1Brown · 26:13–30:12 · 4 min</span></div>
+  <h1>Distillation: training on a distribution instead of an answer</h1>
+  <div class="authors">Part 2 of the compression-is-intelligence pair — the "Distillation" chapter, plus Grant's zoom-out over the whole video</div>
+  <div class="paperlink" style="border-left-color:var(--def)"><span class="lbl">Watch</span><a href="https://youtu.be/GlYgs6v2YfU?t=1573" target="_blank" rel="noopener">But what is cross-entropy? | Compression is Intelligence Part 2 — 3Blue1Brown, from 26:13 ↗</a></div>
+  <p class="mono" style="font-size:12.5px;color:var(--ink-dim)">Transcript: <a class="lnk" href="../transcripts/part2.html#s-1573">this stretch, timestamped</a></p>
+
+  <div class="tldr"><b>TL;DR —</b> Ordinary pre-training is cross-entropy against a one-hot <span class="mono">p</span>: every term of the sum <span class="mono">−Σ p(x)·log q(x)</span> is annihilated except the one for the token that happened to occur, so each example teaches the model exactly one bit of shape — <em>this token, not the others</em>. Distillation keeps the identical formula and puts a real distribution in the <span class="mono">p</span> slot: a bigger teacher model's full output over the whole vocabulary. Now every token contributes, and the student inherits the teacher's <em>shape of uncertainty</em>, not just its top pick. The thing to remember: the one-hot target is an unbiased but very noisy sample of the cross-entropy you actually wanted, and the teacher's distribution is a far lower-variance estimate of it — which is why a student needs so much less data, and why it can never be better than its teacher's own mistakes.</div>
+
+  <p class="lead">P13 finished the hard part of the argument: if you want a per-token loss whose average is minimised <em>only</em> when the model's output distribution matches the statistics in the data, your hand is forced into the negative logarithm, and the average that falls out is literally the cross-entropy formula. That derivation left cross-entropy looking slightly ceremonial, because in ordinary pre-training the <span class="mono">p</span> you take cross-entropy against is a spike on one token and the sum collapses to a single term. This page is where Grant shows the formula being used with both slots genuinely populated — that is distillation — and then steps back to survey the whole video before handing off to Part 3. P15 picks up the last footnote, KL divergence, which is exactly the gap this page keeps circling.</p>
+
+  <h2 id="outline">Outline, with timestamps</h2>
+  <ul class="outline">
+    <li><a href="https://youtu.be/GlYgs6v2YfU?t=1573" target="_blank" rel="noopener">26:13</a> — Setup: a variant of training where the cross-entropy formula is used "more explicitly", and each example tugs the model more softly.</li>
+    <li><a href="https://youtu.be/GlYgs6v2YfU?t=1592" target="_blank" rel="noopener">26:32</a> — Why anyone wants this: you have a big model that works, and you want that behaviour at a much cheaper inference cost.</li>
+    <li><a href="https://youtu.be/GlYgs6v2YfU?t=1622" target="_blank" rel="noopener">27:02</a> — The swap: compare the student's distribution not to the true next token, but to the teacher's full distribution at the same position.</li>
+    <li><a href="https://youtu.be/GlYgs6v2YfU?t=1654" target="_blank" rel="noopener">27:34</a> — The chess analogy, and why one distilled example can do the work of millions of one-hot examples.</li>
+    <li><a href="https://youtu.be/GlYgs6v2YfU?t=1686" target="_blank" rel="noopener">28:06</a> — Zoom out, part one: cross-entropy arose naturally from compression, and generalised into a way to measure how one set of patterns differs from another.</li>
+    <li><a href="https://youtu.be/GlYgs6v2YfU?t=1717" target="_blank" rel="noopener">28:37</a> — The honest admission: the second half's derivation came from constrained optimisation, not compression — but π always hides a circle.</li>
+    <li><a href="https://youtu.be/GlYgs6v2YfU?t=1750" target="_blank" rel="noopener">29:10</a> — The bridge to Part 3: turn a predictor into a compressor whose bit count matches the model's own information content.</li>
+    <li><a href="https://youtu.be/GlYgs6v2YfU?t=1782" target="_blank" rel="noopener">29:42</a> — Payoff promised: cross-entropy loss <em>is</em> training the model to be the best possible text compressor.</li>
+  </ul>
+
+  <h2 id="onehot">What one-hot pre-training is actually optimising <a class="lnk" href="https://youtu.be/GlYgs6v2YfU?t=1573" target="_blank" rel="noopener">26:13</a></h2>
+
+  <p>Write the per-token loss the way P13 left it. The model, given a prefix, emits a distribution <span class="mono">q</span> over the whole vocabulary; the target is a distribution <span class="mono">p</span> over the same vocabulary; the loss is</p>
+
+  <pre class="code-block"><code>H(p, q)  =  − Σ  p(x) · log q(x)
+              x ∈ V</code></pre>
+
+  <p>In standard pre-training <span class="mono">p</span> is one-hot: <span class="mono">p(x) = 1</span> for the token <span class="mono">y</span> that actually appeared in the corpus, and <span class="mono">0</span> for the other fifty-odd thousand entries of the vocabulary <span class="mono">V</span>. Every term but one is multiplied by zero, and what survives is</p>
+
+  <pre class="code-block"><code>H(p, q)  =  − log q(y)</code></pre>
+
+  <p>which is the plain surprisal of the true token. That is the whole of pre-training. But notice what the collapse costs you. The formula has room for a value on <em>every</em> token in the vocabulary, and you are using one slot of it. Whatever opinion the model formed about the other 50,000 tokens is left completely unconstrained by this example. The only instruction the gradient carries is <em>push mass onto</em> <span class="mono">y</span>, <em>take it off everything else, proportionally</em>. Nothing distinguishes a near-miss from an absurdity.</p>
+
+  <p>The reason this works at all is the one Grant established at <a class="lnk" href="https://youtu.be/GlYgs6v2YfU?t=1343" target="_blank" rel="noopener">22:23</a>: averaged over the whole corpus, the one-hot targets reconstruct the real distribution, because the frequency with which each name follows "my name is" <em>is</em> the <span class="mono">p</span> you wanted. You never write the distribution down; you pay for it in repetitions.</p>
+
+  <h2 id="swap">The swap: put the teacher in the p slot <a class="lnk" href="https://youtu.be/GlYgs6v2YfU?t=1622" target="_blank" rel="noopener">27:02</a></h2>
+
+  <p>Distillation changes exactly one thing. You have a large model that already performs well — call its output at this position <span class="mono">p<sub>T</sub></span> — and a small student <span class="mono">q<sub>S</sub></span> you want to make cheap enough to serve. Run both over the same text. At each position, instead of comparing the student to the corpus's one-hot answer, compare it to the teacher's full distribution:</p>
+
+  <pre class="code-block"><code>L  =  H(p_T , q_S)  =  − Σ  p_T(x) · log q_S(x)
+                          x ∈ V</code></pre>
+
+  <p>Same formula, different <span class="mono">p</span>. Now no term vanishes. If the teacher spreads 0.20 on <em>James</em>, 0.15 on <em>Maria</em>, 0.02 on <em>Xiomara</em> and 10<sup>−7</sup> on <em>bulldozer</em>, all of that is a constraint the student is being pushed to satisfy at once. And it is available from a <em>single</em> pass over that piece of text. Where one-hot pre-training needs to see "my name is ___" completed thousands or millions of times before the empirical frequencies approximate a real name distribution, distillation hands you the answer in one shot, because the teacher already did the averaging.</p>
+
+  <blockquote class="q"><span>"As an analogy, it's the difference between trying to learn chess just by watching a game versus having someone better than you talk through all the possible good moves and how heavily they would weight them at each new turn."</span><span class="cite">— Grant Sanderson, <a href="https://youtu.be/GlYgs6v2YfU?t=1654" target="_blank" rel="noopener">27:34</a></span></blockquote>
+
+  <p>That analogy is doing more work than it looks. Watching moves gives you the argmax of a strong policy. Hearing the weighting gives you the policy.</p>
+
+  <h2 id="dark">Dark knowledge: the signal lives in the wrong answers <a class="lnk" href="https://youtu.be/GlYgs6v2YfU?t=1654" target="_blank" rel="noopener">27:34</a></h2>
+
+  <p><em>The rest of this section is my addition — Grant states the idea but does not name the literature.</em> The classic reference is Hinton, Vinyals and Dean, <a href="https://arxiv.org/abs/1503.02531" target="_blank" rel="noopener">"Distilling the Knowledge in a Neural Network"</a> (2015, arXiv:1503.02531; presented at the NIPS 2014 Deep Learning Workshop), building on Buciluǎ, Caruana and Niculescu-Mizil's 2006 "Model Compression". Their argument for <em>why</em> the extra terms carry so much is sharper than "more numbers is more information".</p>
+
+  <p>A trained classifier's probabilities on the <em>incorrect</em> classes are not noise. They are a learned similarity structure. The paper's example: an image of a BMW may have only a tiny chance of being called a garbage truck, but that mistake is still many times more probable than calling it a carrot. The ratio between two near-zero probabilities encodes which things the model considers confusable — which is precisely the generalisation behaviour you want to transfer, and precisely what the hard label cannot express. Hinton called this the <em>dark knowledge</em> in a model; the term comes from his talks about this work rather than from the paper itself.</p>
+
+  <p>The catch is that this information sits in ratios of very small numbers, and cross-entropy weights each term by <span class="mono">p<sub>T</sub>(x)</span>. If the teacher is confident, a probability of 10<sup>−6</sup> versus 10<sup>−9</sup> is an enormous ratio contributing an utterly negligible amount to the loss. The rich part of the signal is present and inaudible.</p>
+
+  <h2 id="temperature">Temperature: turning up the contrast <a class="lnk" href="https://youtu.be/GlYgs6v2YfU?t=1622" target="_blank" rel="noopener">27:02</a></h2>
+
+  <p><em>Also my addition; the video does not cover temperature.</em> The fix in the 2015 paper is to soften both distributions before comparing them, by dividing the logits <span class="mono">z<sub>i</sub></span> by a temperature <span class="mono">T</span> inside the softmax:</p>
+
+  <pre class="code-block"><code>q_i(T)  =  exp(z_i / T)  /  Σ_j exp(z_j / T)</code></pre>
+
+  <p><span class="mono">T = 1</span> is the ordinary softmax. <span class="mono">T &gt; 1</span> flattens the distribution toward uniform, which raises the weight on the small probabilities so their ratios start to matter to the loss; <span class="mono">T &lt; 1</span> sharpens it. Concretely, for logits <span class="mono">(4, 2, 1, 0, −1)</span>:</p>
+
+  <table class="kv">
+    <tr><th>T</th><th>softmax over (4, 2, 1, 0, −1)</th><th>entropy (bits)</th></tr>
+    <tr><td class="mono">1</td><td class="mono">0.826, 0.112, 0.041, 0.015, 0.006</td><td class="mono">0.90</td></tr>
+    <tr><td class="mono">2</td><td class="mono">0.553, 0.203, 0.123, 0.075, 0.045</td><td class="mono">1.79</td></tr>
+    <tr><td class="mono">4</td><td class="mono">0.366, 0.222, 0.173, 0.135, 0.105</td><td class="mono">2.18</td></tr>
+    <tr><td class="mono">8</td><td class="mono">0.277, 0.216, 0.191, 0.168, 0.148</td><td class="mono">2.29</td></tr>
+  </table>
+
+  <p>Two details people get wrong. First, the <em>same</em> <span class="mono">T</span> must be applied to the student's softmax during training, and the student reverts to <span class="mono">T = 1</span> at deployment. Second, the gradient rescaling. The paper derives the gradient of the soft-target cross-entropy with respect to the student's logit <span class="mono">z<sub>i</sub></span> as <span class="mono">(1/T)·(q<sub>i</sub> − p<sub>i</sub>)</span>, and in the high-temperature limit — with logits zero-meaned per example — this approximates <span class="mono">(z<sub>i</sub> − v<sub>i</sub>) / (N·T²)</span>, where <span class="mono">v<sub>i</sub></span> are the teacher's logits. So the soft-target gradients scale as <span class="mono">1/T²</span>, and when you mix a soft-target term with a hard-label term you must multiply the soft term by <span class="mono">T²</span> to keep their relative contributions stable as you tune <span class="mono">T</span>. That <span class="mono">T²</span> factor is the single most commonly dropped line in reimplementations. (A pleasant corollary from the same derivation: in the high-<span class="mono">T</span> limit distillation reduces to matching logits with a squared error, which is what the 2006 model-compression work did directly.)</p>
+
+  <div class="callout"><b>Carry this away.</b> Distillation is not a new objective, it is the same cross-entropy with a better-informed <span class="mono">p</span>. The engineering knobs are three: the temperature <span class="mono">T</span> that decides how much of the teacher's tail you can hear, the <span class="mono">T²</span> rescaling that keeps a mixed soft/hard loss balanced, and the weight on the hard-label term — the 2015 paper found a considerably lower weight on the hard term worked best. Get the <span class="mono">T²</span> wrong and your soft loss silently stops mattering as you raise <span class="mono">T</span>.</div>
+
+  <h2 id="whatitbuys">What the swap buys, information-theoretically — and what it does not <a class="lnk" href="https://youtu.be/GlYgs6v2YfU?t=1686" target="_blank" rel="noopener">28:06</a></h2>
+
+  <p>Here is the cleanest way I know to say what is going on, and it is worth writing out because it also tells you the limits. Suppose the true conditional distribution at this position is <span class="mono">p</span>, and the corpus hands you a single token <span class="mono">y</span> drawn from it. The one-hot loss <span class="mono">−log q(y)</span> is a random variable, and its expectation is</p>
+
+  <pre class="code-block"><code>E          [ − log q(y) ]  =  − Σ p(x)·log q(x)  =  H(p, q)
+ y ~ p                          x</code></pre>
+
+  <p>So the one-hot loss is an <em>unbiased estimator</em> of the cross-entropy you actually wanted — but a one-sample one, with real variance. Take a five-token toy vocabulary where the true <span class="mono">p</span> and the student's <span class="mono">q</span> are:</p>
+
+  <table class="kv">
+    <tr><th>token</th><th>p (target)</th><th>q (student)</th><th>−log₂ q — the one-hot loss if this token is sampled</th></tr>
+    <tr><td class="mono">A</td><td class="mono">0.50</td><td class="mono">0.40</td><td class="mono">1.3219</td></tr>
+    <tr><td class="mono">B</td><td class="mono">0.25</td><td class="mono">0.30</td><td class="mono">1.7370</td></tr>
+    <tr><td class="mono">C</td><td class="mono">0.15</td><td class="mono">0.10</td><td class="mono">3.3219</td></tr>
+    <tr><td class="mono">D</td><td class="mono">0.07</td><td class="mono">0.15</td><td class="mono">2.7370</td></tr>
+    <tr><td class="mono">E</td><td class="mono">0.03</td><td class="mono">0.05</td><td class="mono">4.3219</td></tr>
+  </table>
+
+  <p>The full-distribution loss is <span class="mono">H(p, q) = 1.9147</span> bits. The entropy floor is <span class="mono">H(p) = 1.8309</span> bits, so the gap — the KL divergence P15 is about to name — is <span class="mono">0.0839</span> bits. The one-hot loss has that same mean of <span class="mono">1.9147</span>, and a standard deviation of <span class="mono">0.8377</span> bits: on any given example it is off by roughly half its own value. Every one of those errors is a wrong gradient, and pre-training only survives it by averaging over an astronomical number of tokens.</p>
+
+  <p>Distillation replaces the sample with the distribution. If the teacher were the true <span class="mono">p</span>, the variance from this source would be exactly zero — you would compute the quantity instead of estimating it. That is the real content of "richer signal per example", and it is why Hinton et al. observed that soft targets let a small model be trained on much less data and with a much higher learning rate.</p>
+
+  <p>And now the honest half. The teacher is <em>not</em> <span class="mono">p</span>. It is a model, with its own biases and confident errors, and the student is being trained to reproduce them faithfully. Two consequences follow directly from the formula. First, minimising <span class="mono">H(p<sub>T</sub>, q<sub>S</sub>)</span> over <span class="mono">q<sub>S</sub></span> is minimised exactly at <span class="mono">q<sub>S</sub> = p<sub>T</sub></span> — so on the transfer set the student's target is <em>being the teacher</em>, never beating it. Second, the loss floor is <span class="mono">H(p<sub>T</sub>)</span>, the teacher's entropy, not the entropy of language: a perfect student still reports a nonzero loss equal to the teacher's own uncertainty. What distillation buys is variance, not truth. It gives you a low-noise estimate of a slightly wrong target, in exchange for the high-noise estimate of a correct one — and empirically that trade is overwhelmingly worth it, which is why the technique is everywhere. In practice you usually hedge by keeping a hard-label term in the mix, so the student is still anchored to the corpus where the two disagree.</p>
+
+  <p>Two verified examples of the technique at production scale: <a href="https://arxiv.org/abs/1910.01108" target="_blank" rel="noopener">DistilBERT</a> (Sanh et al., 2019) distils BERT during pre-training to 40% smaller while retaining 97% of its language-understanding score and running 60% faster; and the <a href="https://arxiv.org/abs/2408.00118" target="_blank" rel="noopener">Gemma 2</a> report states that the 2B and 9B models were trained with knowledge distillation "instead of next token prediction", citing Hinton et al. (2015). Modern practice has moved on in the details — much LLM distillation now happens at the sequence level, or on text the teacher generated rather than on a fixed corpus — but the object being minimised is still the cross-entropy on this page.</p>
+
+  <h2 id="zoomout">Zooming out: two roads to the same formula <a class="lnk" href="https://youtu.be/GlYgs6v2YfU?t=1717" target="_blank" rel="noopener">28:37</a></h2>
+
+  <p>Grant then stops and does something a lecturer should do more often: he flags that the video has produced the same formula twice by routes that do not obviously touch. In the first half, cross-entropy fell out of compression — you build an optimal code for one distribution and ask what it costs on another, and <span class="mono">−Σ p(x)·log₂ q(x)</span> is the answer in bits per symbol. In the second half it fell out of constrained optimisation — you demand a loss minimised only at <span class="mono">q = p</span>, apply a Lagrange multiplier, and the logarithm is forced. Those are different fields. Nothing in the second derivation mentions codes.</p>
+
+  <blockquote class="q"><span>"In the same way that whenever you see pi show up in math, even when it seems unrelated to circles, there's always going to be some connection to circles hiding there, I think whenever you see cross-entropy pop up, there will be a way to connect it to compression."</span><span class="cite">— Grant Sanderson, <a href="https://youtu.be/GlYgs6v2YfU?t=1717" target="_blank" rel="noopener">28:37</a></span></blockquote>
+
+  <p>The hinge that will close the loop is already on the table: the pre-training loss was described from the start as the average information per token <em>from the model's perspective</em>. "Information", here, is measured in the units of a code — <span class="mono">log₂(1/q(x))</span> is a length. If you can actually build a compressor that spends that many bits per token, then the loss stops being an analogy about codes and becomes a literal file size. <a class="lnk" href="https://youtu.be/GlYgs6v2YfU?t=1750" target="_blank" rel="noopener">29:10</a></p>
+
+  <p>That construction is Part 3, and Grant flags it as genuinely surprising that it is possible at all: a scheme that turns any predictor into a compressor whose output length matches the predictor's own information content, including the fractional bits that Huffman coding cannot spend. Once you have it, "minimise cross-entropy loss" and "be the best possible text compressor" are the same instruction, and the slogan <em>compression is intelligence</em> becomes a claim you can actually evaluate rather than admire. <a class="lnk" href="https://youtu.be/GlYgs6v2YfU?t=1782" target="_blank" rel="noopener">29:42</a></p>
+
+  <h2 id="stuck">Where people get stuck</h2>
+  <p>Four confusions specific to this stretch:</p>
+  <ul>
+    <li><b>Which model goes in which slot.</b> <span class="mono">H(p, q) = −Σ p·log q</span> is not symmetric, and the roles are not interchangeable. The <em>teacher</em> is <span class="mono">p</span> — the weights, outside the log. The <em>student</em> is <span class="mono">q</span> — inside the log, and the only thing with gradients. Swap them and you are optimising the teacher's fit to the student, which is both wrong and, with a frozen teacher, a no-op.</li>
+    <li><b>"Shouldn't the loss be KL, since KL is the distance?"</b> This is Grant's own parting puzzle. The answer for a frozen teacher: <span class="mono">D(p<sub>T</sub>‖q<sub>S</sub>) = H(p<sub>T</sub>, q<sub>S</sub>) − H(p<sub>T</sub>)</span>, and the subtracted term does not depend on the student's parameters at all. The two losses differ by a constant, so their gradients are identical and training is unchanged. KL is the more interpretable number — it is zero at a perfect match instead of bottoming out at the teacher's entropy — and cross-entropy is the cheaper one, because you never have to evaluate <span class="mono">H(p<sub>T</sub>)</span>. If the teacher is <em>not</em> frozen (online or mutual distillation), the constant is no longer constant and the choice starts to matter. P15 unpacks the divergence itself.</li>
+    <li><b>"One-hot means the target is the truth."</b> No. In pre-training <span class="mono">p</span> is a single draw from the true conditional, not the conditional. Both pre-training and distillation are approximating the same ideal cross-entropy against the real distribution of language; they just use estimators with very different bias–variance profiles. Seeing this clearly is what stops distillation from looking like a hack.</li>
+    <li><b>Temperature is not a smoothing hyperparameter you can set and forget.</b> Raising <span class="mono">T</span> changes the loss surface <em>and</em> shrinks the soft-target gradients by <span class="mono">1/T²</span>. Without the compensating <span class="mono">T²</span>, sweeping <span class="mono">T</span> in a mixed loss is silently also sweeping the relative weight of your two objectives, and you will attribute the result to temperature. Also note the paper's finding that the best <span class="mono">T</span> depends on student capacity: in their MNIST experiment, students with 300+ units per layer were insensitive to <span class="mono">T</span> above 8, but a 30-unit student did much better at <span class="mono">T</span> in the 2.5–4 range — a very small student is better off ignoring the deep tail.</li>
+  </ul>
+
+  <h2 id="further">Going deeper, verified</h2>
+  <ul class="readings">
+    <li><a href="https://arxiv.org/abs/1503.02531" target="_blank" rel="noopener">Distilling the Knowledge in a Neural Network</a> — Hinton, Vinyals &amp; Dean (2015) · The source for everything on this page beyond Grant's four minutes: temperature, the <span class="mono">T²</span> rescaling, the logit-matching limit, and the MNIST result where a distilled 800-unit net drops from 146 to 74 test errors against a 67-error teacher.</li>
+    <li><a href="https://www.cs.cornell.edu/~caruana/compression.kdd06.pdf" target="_blank" rel="noopener">Model Compression</a> — Buciluǎ, Caruana &amp; Niculescu-Mizil, KDD 2006 · The precursor Hinton et al. build on; transfers an ensemble into one small net by matching outputs. (The ACM DOI page returns 403 to scripted requests; this is the authors' copy.)</li>
+    <li><a href="https://arxiv.org/abs/1606.07947" target="_blank" rel="noopener">Sequence-Level Knowledge Distillation</a> — Kim &amp; Rush (2016) · Where the idea stops being per-token: distilling on the teacher's generated sequences rather than its per-position distributions, which is much closer to how LLM distillation is done now.</li>
+    <li><a href="https://arxiv.org/abs/1910.01108" target="_blank" rel="noopener">DistilBERT, a distilled version of BERT</a> — Sanh, Debut, Chaumond &amp; Wolf (2019) · A worked, widely reproduced case of distilling during pre-training rather than per task; the triple loss shows how a soft-target term is combined with the ordinary one in practice.</li>
+    <li><a href="https://arxiv.org/abs/2408.00118" target="_blank" rel="noopener">Gemma 2: Improving Open Language Models at a Practical Size</a> — Gemma Team (2024) · Evidence the technique is load-bearing at frontier scale: the 2B and 9B models were trained with knowledge distillation in place of next-token prediction.</li>
+  </ul>
+
+  <h2 id="exercises">Exercises</h2>
+  <ol class="exercises">
+    <li><b>Reproduce the variance argument</b> — With <span class="mono">p = (0.50, 0.25, 0.15, 0.07, 0.03)</span> and <span class="mono">q = (0.40, 0.30, 0.10, 0.15, 0.05)</span>, compute <span class="mono">H(p, q)</span>, <span class="mono">H(p)</span>, <span class="mono">D(p‖q)</span>, and the standard deviation of the one-hot loss <span class="mono">−log₂ q(y)</span> for <span class="mono">y ~ p</span>. You should recover <span class="mono">1.9147</span>, <span class="mono">1.8309</span>, <span class="mono">0.0839</span> and <span class="mono">0.8377</span> bits. A good answer also states how many independent one-hot samples you would need before the sample mean's standard error drops below 0.01 bits — the arithmetic is <span class="mono">(0.8377/0.01)² ≈ 7,000</span> — and connects that number to the claim that distillation needs far less data.</li>
+    <li><b>Feel the temperature</b> — For logits <span class="mono">(4, 2, 1, 0, −1)</span>, tabulate the softmax and its entropy for <span class="mono">T ∈ {0.5, 1, 2, 4, 8, 32}</span>, and plot the ratio of the 4th to the 5th probability against <span class="mono">T</span>. A good answer explains why that ratio is monotone in <span class="mono">1/T</span> and what happens to it as <span class="mono">T → ∞</span>, then numerically checks the paper's claim by computing <span class="mono">∂L/∂z<sub>i</sub></span> by finite differences at two temperatures and confirming the magnitudes fall roughly as <span class="mono">1/T²</span>.</li>
+    <li><b>Show the gradients are the same</b> — Prove that for a frozen teacher, <span class="mono">∇<sub>θ</sub> H(p<sub>T</sub>, q<sub>S</sub>) = ∇<sub>θ</sub> D(p<sub>T</sub>‖q<sub>S</sub>)</span>, where <span class="mono">θ</span> are the student's parameters. Then answer the harder half: name one concrete situation in which the two losses genuinely diverge in behaviour, and say what changes. (Hint: what has to be true of the teacher for <span class="mono">H(p<sub>T</sub>)</span> to be a constant?)</li>
+  </ol>
+
+  <div class="callout">Previous: <a class="lnk" href="p13.html">P13 Why this loss and not another one</a> · Next: <a class="lnk" href="p15.html">P15 KL divergence: the gap</a> · Back to the <a class="lnk" href="../index.html#cross-entropy">map</a>.</div>
+</main>
+<footer>Original explanation of 3Blue1Brown's "But what is cross-entropy? | Compression is Intelligence Part 2". The lesson and animations are Grant Sanderson's; this page links to them, it does not copy them.</footer>
+</body>
+</html>

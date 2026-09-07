@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>P03 What perfect compression looks like — Entropy, mapped</title>
+<meta name="description" content="Optimal compression has a fingerprint: its output is indistinguishable from fair coin flips. Kraft budgets, the bump-in-the-rug argument, fractional bits." />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="../paper.css" />
+</head>
+<body>
+<header class="bar"><div class="bar-in">
+  <div class="brand"><span class="dot"></span>ENTROPY&nbsp;//&nbsp;FIELD&nbsp;MAP</div>
+  <a class="back" href="../index.html#entropy">← field map</a>
+</div></header>
+<main>
+  <div class="eyebrow"><span class="box wb mono">P03 · REINVENTING ENTROPY</span><span class="mono">3Blue1Brown · 10:46–14:47 · 4 min</span></div>
+  <h1>What perfect compression looks like</h1>
+  <div class="authors">Reinventing Entropy | Compression is Intelligence, Part 1 — the third student's argument, from the chapter of the same name.</div>
+  <div class="paperlink" style="border-left-color:var(--off)"><span class="lbl">Watch</span><a href="https://youtu.be/l6DKRf-fAAM?t=646" target="_blank" rel="noopener">Reinventing Entropy | Compression is Intelligence Part 1 — 3Blue1Brown, from 10:46 ↗</a></div>
+  <p class="mono" style="font-size:12.5px;color:var(--ink-dim)">Transcript: <a class="lnk" href="../transcripts/part1.html#s-646">this stretch, timestamped</a></p>
+
+  <div class="tldr"><b>TL;DR —</b> P02 produced a code that <em>feels</em> optimal; this stretch asks how you could ever prove such a thing without enumerating every possible algorithm. The move is to stop describing codes and start describing the <em>output</em> of a perfect one: it must be indistinguishable from fair, independent coin flips. Any bias or pattern left in a compressed bitstream is structure the compressor failed to spend, i.e. compression left on the table — which makes "how well can this be compressed" and "how well can this be predicted" literally the same question. The supporting lemma is a counting argument on the binary-string diagram: if every message is equally likely, shortening one by a bit forces two others to grow by a bit each. Remember the fingerprint, not the proof.</div>
+
+  <p class="lead">P02 handed us the clever student's prefix code for the robot — <span class="mono">0</span>, <span class="mono">10</span>, <span class="mono">110</span>, <span class="mono">111</span> — averaging 1.75 bits per instruction, and a diagram showing that its four code words carve the space of binary strings into shares of exactly ½, ¼, ⅛, ⅛, matching the four probabilities dead on. That coincidence is suspicious in a promising way, but a coincidence is not a proof: maybe some baroque scheme that swallows a thousand instructions at a time does better. Grant's third student — "head in the clouds", who never writes a code at all — breaks the deadlock by changing what is being argued about. This page is that argument. It ends one sentence short of the definition of information, <span class="mono">log₂(1/p)</span>, which P04 picks up.</p>
+
+  <h2 id="outline">Outline, with timestamps</h2>
+  <ul class="outline">
+    <li><a href="https://youtu.be/l6DKRf-fAAM?t=646" target="_blank" rel="noopener">10:46</a> — The deadlock: the clever code looks perfect, but how would you rule out something cleverer?</li>
+    <li><a href="https://youtu.be/l6DKRf-fAAM?t=658" target="_blank" rel="noopener">10:58</a> — The third student's idea: noise is incompressible, so perfect output must look like noise.</li>
+    <li><a href="https://youtu.be/l6DKRf-fAAM?t=688" target="_blank" rel="noopener">11:28</a> — Sanity check: the robot code really does emit independent fair coin flips, bit by bit.</li>
+    <li><a href="https://youtu.be/l6DKRf-fAAM?t=719" target="_blank" rel="noopener">11:59</a> — Switch to the receiver's seat: an <span class="mono">n</span>-bit message is one of <span class="mono">2ⁿ</span> strings that size.</li>
+    <li><a href="https://youtu.be/l6DKRf-fAAM?t=749" target="_blank" rel="noopener">12:29</a> — Uniform over those <span class="mono">2ⁿ</span>, and the argument is meant to hold for any data, not just robots.</li>
+    <li><a href="https://youtu.be/l6DKRf-fAAM?t=781" target="_blank" rel="noopener">13:01</a> — Push the uniformity back through the encoder: each source message had probability <span class="mono">1/2ⁿ</span>.</li>
+    <li><a href="https://youtu.be/l6DKRf-fAAM?t=813" target="_blank" rel="noopener">13:33</a> — Back to the string diagram: moving one message down a layer collides with its neighbours.</li>
+    <li><a href="https://youtu.be/l6DKRf-fAAM?t=845" target="_blank" rel="noopener">14:05</a> — Bump in the rug: one bit saved here costs two bits elsewhere.</li>
+    <li><a href="https://youtu.be/l6DKRf-fAAM?t=876" target="_blank" rel="noopener">14:36</a> — Equal lengths win for equally likely messages — and that sets up <span class="mono">p = 2⁻ⁿ</span> for P04.</li>
+  </ul>
+
+  <h2 id="reframe">Arguing about the output instead of the algorithm</h2>
+  <p>The question at <a href="https://youtu.be/l6DKRf-fAAM?t=646" target="_blank" rel="noopener">10:46</a> is a quantifier problem. "Is 1.75 bits per instruction optimal?" ranges over <em>all</em> encoding schemes — including ones nobody has invented, ones that buffer a million symbols before emitting anything. You cannot win that race by being clever about codes; you will always be one clever step behind.</p>
+  <p>The third student sidesteps it by asking a different question: forget how the code works — what would its <strong>output</strong> have to look like? That is a property you can state about a bitstream in isolation, without ever seeing the encoder. If you can pin down the fingerprint of optimality, you get a test you can run on any candidate, and a target you can compute against. This is the same manoeuvre as characterising a maximum by its derivative rather than by comparing it to every other point.</p>
+
+  <h2 id="fingerprint">The fingerprint: output that looks like fair coin flips</h2>
+  <blockquote class="q"><span>"…random noise should be incompressible, and therefore, a perfect compression algorithm should produce a bitstream that's indistinguishable from random noise."</span><span class="cite">— Grant Sanderson, <a href="https://youtu.be/l6DKRf-fAAM?t=658" target="_blank" rel="noopener">10:58</a></span></blockquote>
+  <p>Be precise about what "random noise" means here, because the whole argument leans on it: every bit is 0 or 1 with probability ½, and the bits are mutually independent. Not "looks messy". Not "high variance". A fair, memoryless coin.</p>
+  <p>The intuition underneath is a contrapositive. Suppose the output is <em>not</em> like that — bit 40 comes up 1 seventy percent of the time, say, or <span class="mono">11</span> shows up more often than chance. Then the receiver knows something about the stream before receiving it, and knowledge the receiver already has need not be transmitted. The bias is unspent structure, so any code whose output carries a detectable pattern is beatable.</p>
+  <p>The robot code passes exactly, and the check at <a href="https://youtu.be/l6DKRf-fAAM?t=688" target="_blank" rel="noopener">11:28</a> is worth walking yourself. The first bit is 0 exactly when the instruction is <em>up</em>: probability ½. Given a leading 1, the surviving probabilities ¼, ⅛, ⅛ renormalise to ½, ¼, ¼, so the second bit is 0 — meaning <em>down</em> — with conditional probability ½. Given <span class="mono">11</span>, the last two instructions are equally likely, so the third bit is again a fair flip. Every bit is a fair coin conditioned on everything before it, which is exactly independence plus uniformity.</p>
+
+  <h2 id="budget">Code space is a budget, and length is what you spend</h2>
+  <p>The diagram Grant returns to at <a href="https://youtu.be/l6DKRf-fAAM?t=813" target="_blank" rel="noopener">13:33</a> is worth restating as arithmetic, because the arithmetic is the load-bearing part. In a prefix-free code, claiming a code word of length <span class="mono">ℓ</span> forbids every longer string that starts with it — you have claimed a fraction <span class="mono">2⁻ˡ</span> of the space of all binary strings, and nobody else may touch it. <strong>Each extra bit of length halves your claim.</strong> Since the claims are disjoint and live inside a space of total measure 1, they must sum to at most 1.</p>
+  <pre class="code-block"><code>Σᵢ 2^(−ℓᵢ)  ≤  1
+
+robot:  2^(−1) + 2^(−2) + 2^(−3) + 2^(−3)  =  ½ + ¼ + ⅛ + ⅛  =  1
+        (budget spent exactly — nothing left over, nothing overdrawn)</code></pre>
+  <p><em>My addition, not Grant's:</em> this is <strong>Kraft's inequality</strong> (Leon Kraft, 1949, for prefix codes; Brockway McMillan extended it in 1956 to all uniquely decodable codes, so you cannot escape the budget by abandoning the prefix property). The converse also holds — any list of lengths satisfying the inequality can be realised by some prefix code — which turns "design a code" into "choose a list of lengths that fits the budget", a much easier optimisation.</p>
+  <table class="kv">
+    <tr><th>Instruction</th><th>p</th><th>Code word</th><th>ℓ</th><th>Share 2⁻ˡ</th><th>log₂(1/p)</th><th>p·ℓ</th></tr>
+    <tr><td>up</td><td>1/2</td><td class="mono">0</td><td>1</td><td>1/2</td><td>1</td><td>0.500</td></tr>
+    <tr><td>down</td><td>1/4</td><td class="mono">10</td><td>2</td><td>1/4</td><td>2</td><td>0.500</td></tr>
+    <tr><td>left</td><td>1/8</td><td class="mono">110</td><td>3</td><td>1/8</td><td>3</td><td>0.375</td></tr>
+    <tr><td>right</td><td>1/8</td><td class="mono">111</td><td>3</td><td>1/8</td><td>3</td><td>0.375</td></tr>
+    <tr><td><b>total</b></td><td>1</td><td>—</td><td>—</td><td><b>1.000</b></td><td>—</td><td><b>1.750</b></td></tr>
+  </table>
+  <p>Note the two columns that agree: <span class="mono">ℓ</span> and <span class="mono">log₂(1/p)</span>. That is not luck, and it is exactly what P04 will name. <em>My addition:</em> minimising <span class="mono">L = Σ pᵢ·ℓᵢ</span> subject to the Kraft budget, with the integrality constraint relaxed, gives <span class="mono">ℓᵢ = log₂(1/pᵢ)</span> and <span class="mono">L = Σ pᵢ·log₂(1/pᵢ)</span>. The one-line proof that you cannot do better is Gibbs' inequality: set <span class="mono">qᵢ = 2^(−ℓᵢ)</span>, and <span class="mono">Σ pᵢ·log₂(1/qᵢ) ≥ Σ pᵢ·log₂(1/pᵢ)</span> with equality only when <span class="mono">q = p</span>.</p>
+
+  <h2 id="uniform">From "looks like noise" to "every message was equally likely"</h2>
+  <p>At <a href="https://youtu.be/l6DKRf-fAAM?t=719" target="_blank" rel="noopener">11:59</a> the frame shifts from single symbols to whole messages, and from the sender to the receiver. Suppose the receiver gets a compressed string of <span class="mono">n</span> bits. There are <span class="mono">2ⁿ</span> strings of that length. If the stream really is fair coin flips, those <span class="mono">2ⁿ</span> strings are equally likely, each with probability <span class="mono">2⁻ⁿ</span>.</p>
+  <p>Now push that back through the encoder, the step at <a href="https://youtu.be/l6DKRf-fAAM?t=781" target="_blank" rel="noopener">13:01</a>. Compression is lossless, so the map from source messages to code words is injective and the decoder inverts it; a probability on the code word is therefore the probability of the unique source message behind it. Conclusion: <strong>in a perfect scheme, every message that compresses to <span class="mono">n</span> bits had probability exactly <span class="mono">2⁻ⁿ</span> of arising in the first place.</strong></p>
+  <p>Grant flags at <a href="https://youtu.be/l6DKRf-fAAM?t=749" target="_blank" rel="noopener">12:29</a> that this is deliberately not about robots any more: nothing in it mentions four instructions or a fixed step size. It is a statement about compressors of anything — English, images, DNA, sensor logs — and that generality is what pays for the abstraction.</p>
+
+  <h2 id="rug">Why the uniform case is a dead end: pushing a bump around a rug</h2>
+  <p>All that remains is the lemma the argument was set up for: a source of <span class="mono">2ⁿ</span> equally likely messages genuinely cannot be compressed below <span class="mono">n</span> bits on average. Grant does it geometrically at <a href="https://youtu.be/l6DKRf-fAAM?t=813" target="_blank" rel="noopener">13:33</a>; the Kraft budget makes it arithmetic. Currently every message sits on layer <span class="mono">n</span> and claims <span class="mono">2⁻ⁿ</span> of the space; <span class="mono">2ⁿ</span> of them claim all of it. Try to shorten one:</p>
+  <pre class="code-block"><code>message A:  n → n−1 bits    claim goes 2^(−n) → 2^(−n+1)    overdrawn by 2^(−n)
+
+pay for it: two messages    n → n+1 bits
+            each frees      2^(−n) − 2^(−n−1) = 2^(−n−1)
+            two of them     2 · 2^(−n−1) = 2^(−n)          budget balances
+
+net over the three:  −1 + 1 + 1  =  +1 bit worse</code></pre>
+  <blockquote class="q"><span>"You're basically pushing down a bump on the rug, only to see it pop up even worse in another spot."</span><span class="cite">— Grant Sanderson, <a href="https://youtu.be/l6DKRf-fAAM?t=845" target="_blank" rel="noopener">14:05</a></span></blockquote>
+  <p>Because all <span class="mono">2ⁿ</span> messages are equally likely, that <span class="mono">+1</span> is not offset by anything: the expected length rises by <span class="mono">1/2ⁿ</span> bits. The trade is always unfavourable, which is the content of the remark at <a href="https://youtu.be/l6DKRf-fAAM?t=876" target="_blank" rel="noopener">14:36</a> that flat, equal-length codes are optimal for a uniform source. <em>My addition:</em> the coarser version of this is the pigeonhole argument — there are only <span class="mono">2ⁿ − 1</span> binary strings shorter than <span class="mono">n</span> bits, so no injective map can shorten all <span class="mono">2ⁿ</span> messages, and every "compresses everything" claim is provably false before you read the source code.</p>
+
+  <h2 id="prediction">Therefore: compressibility and predictability are one question</h2>
+  <p>Put the fingerprint and the lemma together and you get the sentence the whole trilogy runs on. Structure in a bitstream <em>is</em> predictability, and predictability <em>is</em> unspent compression: a pattern the decoder could have inferred for itself was waste to transmit, and if the decoder truly cannot guess the next bit better than a coin, there is nothing left to remove.</p>
+  <div class="callout"><b>The falsifiable version.</b> Take any compressor's output. If you can build a model that predicts the next bit of it better than chance — measured honestly, on held-out data, with the model's own size charged against you — then that compressor was not optimal, and you can convert your edge into a strictly smaller file by feeding your predictions to an arithmetic coder. This is a test, not a metaphor: it fails loudly, and it is the reason "compression benchmark" and "language-model benchmark" have converged on measuring the same number.</div>
+  <p><em>My addition — the exchange rate, so you can see it is not hand-waving.</em> Suppose a predictor says the next bit is 1 with probability <span class="mono">½ + ε</span>. Coding that bit against your prediction costs the binary entropy <span class="mono">H₂(½+ε)</span> instead of a full bit:</p>
+  <pre class="code-block"><code>H₂(½ + ε)  =  1 − (2/ln 2)·ε²  +  O(ε⁴)   bits per bit
+
+ε = 0.05  →  H₂(0.55) = 0.99278  →  0.722 % of every bit was waste
+             on a 1 MiB file that is ≈ 60,600 bits ≈ 7.4 KiB you could still remove</code></pre>
+  <p>The quadratic is the important shape: a tiny edge buys a very small saving, which is why weak biases in a good compressor's output are hard to monetise — but the saving is strictly positive for any <span class="mono">ε ≠ 0</span>, so "optimal" really does mean "zero edge", not "small edge".</p>
+
+  <h2 id="fractions">The fraction you cannot spend</h2>
+  <p>There is an obvious crack in the story, and Grant walks up to it at the end of this stretch. The argument concluded <span class="mono">p = 2⁻ⁿ</span>, so the ideal length is <span class="mono">log₂(1/p)</span> — an integer only when <span class="mono">p</span> is a power of two. The robot was rigged so that it was; real sources are not. If <span class="mono">p = 0.3</span> the ideal length is <span class="mono">1.737</span> bits, and no prefix code emits 1.737 bits for a symbol.</p>
+  <p>A symbol-by-symbol prefix code must round each length up to an integer, so it pays a rounding penalty on every symbol. Huffman's algorithm is optimal <em>among such codes</em>, and its expected length satisfies <span class="mono">H(p) ≤ L &lt; H(p) + 1</span> — the overhead is under a bit per symbol, but it does not vanish. Two standard escapes recover the fraction:</p>
+  <ul>
+    <li><strong>Block coding.</strong> Treat <span class="mono">N</span> consecutive symbols as one super-symbol and Huffman-code the blocks. The single rounding penalty is now amortised over <span class="mono">N</span> symbols, so the per-symbol overhead drops below <span class="mono">1/N</span>. The cost is an alphabet of size <span class="mono">|A|ᴺ</span>, which is why nobody pushes <span class="mono">N</span> very far.</li>
+    <li><strong>Arithmetic coding</strong> (Rissanen and Pasco, independently in 1976; popularised by Witten, Neal and Cleary's 1987 tutorial). It never assigns a code word to a symbol at all. The whole message is one nested subdivision of the interval <span class="mono">[0, 1)</span> — each symbol narrows the current interval in proportion to its probability — and the output is enough binary digits to name a point inside the final interval. The final interval has width equal to the message probability <span class="mono">P</span>, so naming a point in it takes about <span class="mono">log₂(1/P)</span> bits; the standard bound is within about two bits <em>for the entire message</em>. Rounding is paid once, not once per symbol, so the per-symbol overhead is <span class="mono">O(1/n)</span> and goes to zero. It also accepts a fresh probability distribution at every step, which is exactly what you need when the distribution comes from a language model.</li>
+  </ul>
+  <table class="kv">
+    <tr><th>Scheme, on a uniform 3-symbol source (H = log₂3 = 1.58496 bits)</th><th>Bits / symbol</th><th>Overhead</th></tr>
+    <tr><td>Huffman, one symbol at a time (lengths 1, 2, 2)</td><td>5/3 = 1.66667</td><td>0.08170</td></tr>
+    <tr><td>Huffman on blocks of 2 (9 words: seven of length 3, two of length 4)</td><td>29/18 = 1.61111</td><td>0.02615</td></tr>
+    <tr><td>Huffman on blocks of 3 (27 words: five of length 4, twenty-two of length 5)</td><td>130/81 = 1.60494</td><td>0.01998</td></tr>
+    <tr><td>Arithmetic coding, message of n symbols</td><td>1.58496 + O(1/n)</td><td>→ 0</td></tr>
+  </table>
+  <p>So the fractional-bit awkwardness is real for symbol codes and essentially fictional for stream codes — which is why P04 can define information as <span class="mono">log₂(1/p)</span>, a continuous quantity, without apology, and why the third video of the trilogy can promise to hit the theoretical bound to within a bit or two on actual English.</p>
+
+  <h2 id="stuck">Where people get stuck</h2>
+  <p><strong>"Isn't this circular? It assumes optimal output is noise, then proves noise is incompressible."</strong> It is two separate halves and it helps to name them. The first half — an output with detectable structure is beatable — is the contrapositive of optimality, and Grant leaves it as intuition rather than proving it here (the proof is the arithmetic-coding construction above: an edge converts into a shorter file). The second half — a uniform source cannot be beaten — is the bump-in-the-rug counting argument, and that one <em>is</em> proved at <a href="https://youtu.be/l6DKRf-fAAM?t=813" target="_blank" rel="noopener">13:33</a>. Together they say noise-like output is the fixed point: nothing better exists, and anything else is worse.</p>
+  <p><strong>"Real gzip output is obviously not random — it has a magic number and a header."</strong> True, and it does not dent the claim. The argument is about the ideal payload, not the container: framing, checksums, dictionaries and end-of-stream markers are all overhead that a lossless format needs and a mathematical idealisation ignores. When you run the coin-flip test on a real file, strip the header first and test the compressed body.</p>
+  <p><strong>"Incompressible" is a statement about the ensemble, not about your file.</strong> No compressor shortens every input — pigeonhole forbids it. What the argument establishes is a bound on the <em>expected</em> length, averaged over the source distribution. Any particular file may still be lucky, and a compressor overfitted to one specific file can shrink it dramatically while making everything else longer.</p>
+  <p><strong>Fractional bits look like nonsense, and at the symbol level they are.</strong> There is no way to give the letter <span class="mono">i</span> a code word 4.19 bits long. The quantity is only meaningful as a contribution to a whole-message length, where the fractions of many symbols add up and get rounded once at the end. Hold that thought until P04 — it is the reason Grant insists the definition applies to messages and only bounds symbols on average.</p>
+
+  <h2 id="further">Going deeper, verified</h2>
+  <ul class="readings">
+    <li><a href="https://colah.github.io/posts/2015-09-Visual-Information/" target="_blank" rel="noopener">Visual Information Theory</a> — Chris Olah (2015) · The post Grant credits in the description for this way of drawing entropy; its "code space as a budget you spend" pictures are the same intuition as the string diagram, developed further.</li>
+    <li><a href="https://people.math.harvard.edu/~ctm/home/text/others/shannon/entropy/entropy.pdf" target="_blank" rel="noopener">A Mathematical Theory of Communication</a> — Claude Shannon (1948) · The source. Part I sets up discrete sources and codes; the noiseless coding theorem is the rigorous form of everything argued informally on this page.</li>
+    <li><a href="https://www.inference.org.uk/mackay/itila/" target="_blank" rel="noopener">Information Theory, Inference, and Learning Algorithms</a> — David MacKay (2003) · Free full text. Chapter 5 does Kraft and Huffman properly, including why the rounding overhead is under a bit; Chapter 6 does arithmetic coding with worked intervals.</li>
+    <li><a href="https://web.stanford.edu/class/ee398a/handouts/papers/WittenACM87ArithmCoding.pdf" target="_blank" rel="noopener">Arithmetic Coding for Data Compression</a> — Witten, Neal and Cleary, CACM 30(6) (1987) · The tutorial that made arithmetic coding practical, with the C implementation. Read it if you want to actually build the thing that turns a predictor into a compressor.</li>
+  </ul>
+
+  <h2 id="exercises">Exercises</h2>
+  <ol class="exercises">
+    <li><b>Audit a code with Kraft.</b> Compute <span class="mono">Σ 2^(−ℓᵢ)</span> for the robot code (should be exactly 1), then for the naive two-bits-each code (also 1 — flat codes spend the budget too, just badly), then for the proposed lengths 1, 2, 2, 3. A good answer states the sum, says whether a prefix code with those lengths can exist, and — for any list with slack left over — names which code word could be shortened and by how much.</li>
+    <li><b>Run the coin-flip test.</b> Take a plain text file and its gzip. Strip gzip's 10-byte header and the 8-byte trailer, then compute, for the remaining payload and for the plain text: the fraction of 1 bits, and the four 2-gram frequencies. A good answer reports both sets of numbers, notes that the text is wildly biased and the payload is close to uniform, and uses <span class="mono">H₂(½+ε) ≈ 1 − 2ε²/ln 2</span> to convert whatever residual bias you measure into an estimate of the bits still recoverable — plus an honest caveat that a bias measured on the same file you are testing is not held-out evidence.</li>
+    <li><b>Buy back the fraction.</b> For the uniform 3-symbol source, reproduce the table above: run Huffman on the 3 symbols, then on the 9 pairs, then on the 27 triples, and confirm 1.66667, 1.61111, 1.60494 bits per symbol against <span class="mono">log₂3 = 1.58496</span>. A good answer reports the length multiset at each block size, verifies Kraft is tight in each case, and states the block size at which the overhead first falls below 0.01 bits per symbol.</li>
+  </ol>
+
+  <div class="callout">Previously: <a class="lnk" href="p02.html">P02 The warmup: four instructions, three students, and prefix codes</a> · Next: <a class="lnk" href="p04.html">P04 Defining information: why log(1/p) and nothing else</a> · Back to the <a class="lnk" href="../index.html#entropy">map</a>.</div>
+</main>
+<footer>Original explanation of 3Blue1Brown's Reinventing Entropy | Compression is Intelligence Part 1. The lesson and animations are Grant Sanderson's; this page links to them, it does not copy them.</footer>
+</body>
+</html>

@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>P08 Recap: what makes a code optimal — Entropy, mapped</title>
+<meta name="description" content="Optimal code length is log₂(1/p) bits, entropy is the average, and the two caveats Grant skips are exactly what set up cross-entropy." />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="../paper.css" />
+</head>
+<body>
+<header class="bar"><div class="bar-in">
+  <div class="brand"><span class="dot"></span>ENTROPY&nbsp;//&nbsp;FIELD&nbsp;MAP</div>
+  <a class="back" href="../index.html#cross-entropy">← field map</a>
+</div></header>
+<main>
+  <div class="eyebrow"><span class="box bb mono">P08 · CROSS-ENTROPY</span><span class="mono">3Blue1Brown · 03:02–05:20 · 2 min</span></div>
+  <h1>Recap: what makes a code optimal</h1>
+  <div class="authors">"But what is cross-entropy? | Compression is Intelligence Part 2" — the two minutes where Grant compresses all of Part 1 into a single formula, so that Part 2 has somewhere to stand.</div>
+  <div class="paperlink" style="border-left-color:var(--def)"><span class="lbl">Watch</span><a href="https://youtu.be/GlYgs6v2YfU?t=182" target="_blank" rel="noopener">But what is cross-entropy? | Compression is Intelligence Part 2 — 3Blue1Brown, from 03:02 ↗</a></div>
+  <p class="mono" style="font-size:12.5px;color:var(--ink-dim)">Transcript: <a class="lnk" href="../transcripts/part2.html#s-182">this stretch, timestamped</a></p>
+
+  <div class="tldr"><b>TL;DR —</b> If a symbol shows up with probability <span class="mono">p</span>, the best any encoder can do is spend <span class="mono">log₂(1/p)</span> bits on it, and the average of that over the whole alphabet — <span class="mono">H(p) = Σ p(x)·log₂(1/p(x))</span> — is a hard floor, not a target. The reason is a budget: prefix-free code words compete for a total of 1, so buying one short word makes another long. Two things Grant waves past for pacing are the whole difficulty of the subject: <span class="mono">log₂(1/p)</span> is virtually never a whole number, so real codes reach the floor only in aggregate; and the distribution <span class="mono">p</span> has to come from somewhere. That second point is the hinge. Everything after this page is about what happens when the distribution you built the code from is not the distribution the data actually follows.</div>
+
+  <p class="lead">Part 2 of the series opens on a magic trick — <a class="lnk" href="p07.html">gzip reconstructing the family tree of European languages</a> — and then stops to reload. This stretch is that reload: Part 1's entire argument compressed into two minutes, so a viewer arriving cold has the one formula they need. A recap states the true thing quickly and leaves the reader no scars from having earned it, so this page restates the result and then does the part a recap cannot — shows why it is forced rather than chosen, and names the two soft spots Grant papers over. Both are load-bearing. The next page, <a class="lnk" href="p09.html">defining cross-entropy</a>, pushes on the second until it breaks.</p>
+
+  <h2 id="outline">Outline, with timestamps</h2>
+  <ul class="outline">
+    <li><a href="https://youtu.be/GlYgs6v2YfU?t=182" target="_blank" rel="noopener">03:02</a> — Reload: cross-entropy is easiest to motivate through bit encodings, so back to bits we go.</li>
+    <li><a href="https://youtu.be/GlYgs6v2YfU?t=188" target="_blank" rel="noopener">03:08</a> — The frame from Part 1: a message is a sequence of symbols drawn from a distribution, and those probabilities set a hard limit on compression.</li>
+    <li><a href="https://youtu.be/GlYgs6v2YfU?t=218" target="_blank" rel="noopener">03:38</a> — The toy world returns: four robot instructions with probabilities ½, ¼, ⅛, ⅛, and the code that costs 1, 2, 3, 3 bits.</li>
+    <li><a href="https://youtu.be/GlYgs6v2YfU?t=249" target="_blank" rel="noopener">04:09</a> — Generalization: an optimal code spends <span class="mono">−log₂ p</span> bits on a symbol of probability <span class="mono">p</span>, which is really "how many halvings to get down to p".</li>
+    <li><a href="https://youtu.be/GlYgs6v2YfU?t=279" target="_blank" rel="noopener">04:39</a> — Shannon's name for that quantity is information content — and the admission that it is usually not a whole number.</li>
+    <li><a href="https://youtu.be/GlYgs6v2YfU?t=311" target="_blank" rel="noopener">05:11</a> — The rescue: information adds over a message, and an optimal encoding of the <em>whole</em> message is about that total, so fractional bits are real.</li>
+  </ul>
+
+  <h2 id="reload"><a href="https://youtu.be/GlYgs6v2YfU?t=182" target="_blank" rel="noopener">03:02</a> · Why the video restarts here</h2>
+  <p>Cross-entropy shows up in two places that look nothing alike: the theory of compression, and the loss function that trains language models. Grant builds it from the compression side first, because that is where it has a meaning you can count — bits down an actual wire — and only then reveals that the training objective is the same object in different clothes. But that requires Part 1 to be in the reader's hands, and Part 1 is a half-hour video. Hence this recap. Read it as the minimum viable prerequisite; everything below is unpacked properly across <a class="lnk" href="p02.html">P2</a>, <a class="lnk" href="p03.html">P3</a>, <a class="lnk" href="p04.html">P4</a> and <a class="lnk" href="p06.html">P6</a>.</p>
+
+  <h2 id="toy"><a href="https://youtu.be/GlYgs6v2YfU?t=218" target="_blank" rel="noopener">03:38</a> · The toy world, with every number on the table</h2>
+  <p>The running example is a stream of instructions to a distant robot, one of four: up, down, left, right, and they are not equally likely. Up is sent half the time, down a quarter, left and right an eighth each — a biased random walk, and that bias is exactly what a compressor eats. The code lengths come out as clean integers <em>only because</em> every probability is a power of two, which is why this example was chosen. The whole thing, arithmetic included:</p>
+
+  <table class="kv">
+    <tr><th>symbol</th><th>p</th><th>log₂(1/p)</th><th>code word</th><th>p · log₂(1/p)</th><th>Kraft share 2^(−ℓ)</th></tr>
+    <tr><td>up</td><td>1/2 = 0.500</td><td>1 bit</td><td><span class="mono">0</span></td><td>0.500</td><td>0.500</td></tr>
+    <tr><td>down</td><td>1/4 = 0.250</td><td>2 bits</td><td><span class="mono">10</span></td><td>0.500</td><td>0.250</td></tr>
+    <tr><td>left</td><td>1/8 = 0.125</td><td>3 bits</td><td><span class="mono">110</span></td><td>0.375</td><td>0.125</td></tr>
+    <tr><td>right</td><td>1/8 = 0.125</td><td>3 bits</td><td><span class="mono">111</span></td><td>0.375</td><td>0.125</td></tr>
+    <tr><td><b>total</b></td><td>1.000</td><td>—</td><td>—</td><td><b>H = 1.750 bits</b></td><td><b>1.000</b></td></tr>
+  </table>
+
+  <p>Two numbers in that table deserve staring at. The fifth column sums to <span class="mono">1.75</span>: that is the average cost per instruction, against the <span class="mono">2</span> bits a fixed-width code would spend, a 12.5% saving bought entirely from knowing the bias. The last column also sums to exactly <span class="mono">1</span>, and that is not a coincidence — it is the budget being spent to the last cent, which is the next section.</p>
+
+  <h2 id="logp"><a href="https://youtu.be/GlYgs6v2YfU?t=249" target="_blank" rel="noopener">04:09</a> · The one line worth memorizing</h2>
+  <p>Strip away the robot and the rule is: <b>an optimal code spends <span class="mono">log₂(1/p)</span> bits on a symbol of probability <span class="mono">p</span></b>. Written as <span class="mono">−log₂ p</span> it looks like an arbitrary bit of algebra with a minus sign bolted on; written as <span class="mono">log₂(1/p)</span> it is a count of halvings — how many times do you have to halve 1 before you get down to <span class="mono">p</span>? For <span class="mono">p = ⅛</span> the answer is three, and the code word is three bits long. Grant makes the same point by wishing the field had picked a different base:</p>
+
+  <blockquote class="q"><span>"I kind of wish that history had unfolded in such a way that we call it the log base 1 half of the probability, since it's really just asking how many times do you chop things in half to get down to a certain amount."</span><span class="cite">— Grant Sanderson, <a href="https://youtu.be/GlYgs6v2YfU?t=249" target="_blank" rel="noopener">04:09</a></span></blockquote>
+
+  <p>He is right on the mathematics as well as the pedagogy: <span class="mono">log</span> base <span class="mono">½</span> of <span class="mono">p</span> equals <span class="mono">log₂(p) / log₂(½) = −log₂(p)</span>. Same number, no minus sign to lose. Shannon's name for it, coined in the 1948 paper, is the <b>information content</b> (or surprisal) of the event <a class="lnk" href="https://youtu.be/GlYgs6v2YfU?t=279" target="_blank" rel="noopener">(04:39)</a>. Average it over the distribution and you get entropy, <span class="mono">H(p) = Σ p(x)·log₂(1/p(x))</span> — the 1.75 in the table. Why it has to be a logarithm and not some other decreasing function is <a class="lnk" href="p04.html">P4</a>'s subject; the one-line version is that independent surprises must add, and the logarithm is the only thing that turns multiplied probabilities into added bits.</p>
+
+  <h2 id="floor"><a href="https://youtu.be/GlYgs6v2YfU?t=249" target="_blank" rel="noopener">04:09</a> · Why the floor cannot be cheated</h2>
+  <p>Grant asserts optimality here rather than proving it, which is correct for a recap and unsatisfying for a reference card, so here is the argument in full. <em>(This section is my addition — the theorem names are standard, Grant does not use them in this stretch.)</em> The constraint that does the work is <b>Kraft's inequality</b> (Kraft, 1949; extended by McMillan in 1956 to every uniquely decodable code, not just prefix-free ones, which is why insisting on prefix-freeness costs you nothing). Think of a code word of length <span class="mono">ℓ</span> as claiming every infinite bit string that starts with it — a slice of size <span class="mono">2^(−ℓ)</span>. Prefix-freeness says the slices do not overlap. So they must fit inside 1.</p>
+
+  <pre class="code-block"><code>Kraft's inequality — for a prefix-free binary code with word lengths ℓ₁…ℓₙ:
+
+    Σᵢ 2^(−ℓᵢ)  ≤  1        (and any lengths obeying it can be realized)
+
+Minimize the expected length  L = Σᵢ pᵢ·ℓᵢ  against that budget:
+
+    ℓᵢ = log₂(1/pᵢ)    ⇒    L = Σᵢ pᵢ·log₂(1/pᵢ)  =  H(p)
+
+Nothing else does better. For ANY qᵢ ≥ 0 with Σᵢ qᵢ ≤ 1, concavity of log gives
+
+    Σᵢ pᵢ·log₂(qᵢ/pᵢ)  ≤  log₂( Σᵢ pᵢ·(qᵢ/pᵢ) )  =  log₂( Σᵢ qᵢ )  ≤  0
+
+    ⇒   Σᵢ pᵢ·log₂(1/qᵢ)   ≥   Σᵢ pᵢ·log₂(1/pᵢ)   =   H(p)</code></pre>
+
+  <p>That last line is Gibbs' inequality, proved in one step from Jensen's. Read it slowly, because it is the whole rest of the video in embryo: the left-hand side is what you pay when your code was built for <span class="mono">q</span> and reality is <span class="mono">p</span>; the right-hand side is entropy; and the inequality says the mismatch is never free and is zero only when <span class="mono">q = p</span>. That left-hand side already <em>is</em> cross-entropy. <a class="lnk" href="p09.html">P9</a> gives it the name.</p>
+
+  <h2 id="fractional"><a href="https://youtu.be/GlYgs6v2YfU?t=279" target="_blank" rel="noopener">04:39</a> · Caveat one: log₂(1/p) is almost never a whole number</h2>
+  <p>The toy example works because ½, ¼, ⅛, ⅛ are powers of two. Change one probability to ⅓ and the ideal length becomes <span class="mono">log₂ 3 ≈ 1.585</span> bits, and you cannot emit 1.585 bits. Any code that maps one symbol to one string of bits must round up, and rounding up is a real cost. The standard guarantee — the Shannon source coding theorem, sharpened by Huffman's construction — is that the best per-symbol code lands somewhere in <span class="mono">H(p) ≤ L &lt; H(p) + 1</span>: at worst one wasted bit per symbol, which for a low-entropy source can be a disaster.</p>
+  <p>The fix is to stop coding symbols one at a time. Code blocks of <span class="mono">n</span> symbols as single super-symbols and the wasted bit is amortized over <span class="mono">n</span>, so the overhead falls like <span class="mono">1/n</span>. Three fair-die symbols, each of probability ⅓, make the point concretely:</p>
+
+  <table class="kv">
+    <tr><th>block size n</th><th>super-symbols</th><th>Huffman word lengths</th><th>bits / symbol</th><th>overhead vs H = 1.5850</th></tr>
+    <tr><td>1</td><td>3</td><td>1, 2, 2</td><td>5/3 = 1.6667</td><td>+0.0817</td></tr>
+    <tr><td>2</td><td>9</td><td>seven of 3, two of 4</td><td>29/18 = 1.6111</td><td>+0.0262</td></tr>
+    <tr><td>3</td><td>27</td><td>five of 4, twenty-two of 5</td><td>130/81 = 1.6049</td><td>+0.0200</td></tr>
+    <tr><td>→ ∞</td><td>—</td><td>—</td><td>→ 1.5850</td><td>→ 0</td></tr>
+  </table>
+
+  <p>Arithmetic coding takes this to its limit by never building a code book at all: it encodes the entire message as a single number in <span class="mono">[0, 1)</span>, narrowing the interval by a factor of <span class="mono">p</span> at each symbol, and finishes within about two bits of the message's total information content <em>regardless of length</em>. That is what Grant is gesturing at when he says information adds over a message and the encoding is approximately that total:</p>
+
+  <blockquote class="q"><span>"So fractional information really does have a very real meaning here."</span><span class="cite">— Grant Sanderson, <a href="https://youtu.be/GlYgs6v2YfU?t=311" target="_blank" rel="noopener">05:11</a></span></blockquote>
+
+  <p>Be blunt about the logical status of this, because it is where the subject stops being about code books. Entropy is <em>not</em> the length of any code you can write down; it is the limit that block and arithmetic coding approach, and it is the right thing to measure precisely because it ignores the integer bookkeeping of any particular encoder.</p>
+
+  <h2 id="where-p"><a href="https://youtu.be/GlYgs6v2YfU?t=311" target="_blank" rel="noopener">05:11</a> · Caveat two: the distribution has to come from somewhere</h2>
+  <p>Every sentence above starts with "given the probabilities". Grant grants himself the distribution — the space agency told us the robot's bias — and in the toy world that is fair. Out in the world nobody hands you <span class="mono">p</span>. You estimate it from a sample, or you assert it from a model, and either way the thing you actually build your code from is some <span class="mono">q</span> that is not <span class="mono">p</span>. Worse, the decoder needs the same <span class="mono">q</span>, so a fully honest accounting also charges you for transmitting the model itself — the idea that becomes two-part codes and minimum description length. <em>(That last connection is my addition; Grant does not raise it here.)</em></p>
+
+  <div class="callout">The practitioner's takeaway from this page: <b>a probability model and a compressor are the same object.</b> Hand me a distribution over next symbols and I can mechanically build a coder that spends <span class="mono">log₂(1/q(x))</span> bits per symbol; hand me a coder and I can read a distribution back out of its code lengths. Nothing is lost in either direction. So "how good is my model of this data" and "how small can I make this file" are literally the same question, measured in the same units. That equivalence is why a 2002 paper could cluster languages with <span class="mono">gzip</span>, and why the loss function that trains a language model turns out to be a compression rate.</div>
+
+  <h2 id="question"><a href="https://youtu.be/GlYgs6v2YfU?t=311" target="_blank" rel="noopener">05:11</a> · The question Part 2 turns on</h2>
+  <p>Combine the two caveats and the rest of the video takes shape. Coding is optimal relative to a distribution; the distribution is a guess; so the interesting quantity is not "how many bits does an optimal code use" but <b>"how many bits does a code built for <span class="mono">q</span> use when the data actually follows <span class="mono">p</span>?"</b> That number has a name and a formula, and Gibbs' inequality above already told us it can only be larger than <span class="mono">H(p)</span>. Grant answers it in the very next breath by re-aiming the robot: the space agency rotates the mission so that right becomes the common instruction, the old code stays bolted into the hardware, and the average cost climbs from 1.75 to 2.625 bits per instruction. That excess — where it comes from, why it is asymmetric in <span class="mono">p</span> and <span class="mono">q</span>, and why it is the loss function used to train every large language model — is <a class="lnk" href="p09.html">P9</a> onward.</p>
+
+  <h2 id="stuck">Where people get stuck</h2>
+  <p><b>"Why does the <em>most likely</em> symbol get the <em>shortest</em> code?"</b> Because you pay for a code word every time you send it. Length is a cost and probability is how often you pay it, so the product <span class="mono">p·ℓ</span> is what matters and you want the big <span class="mono">p</span> multiplied by the small <span class="mono">ℓ</span>. In the table above, "up" and "down" each contribute the same 0.5 bits to the average for exactly opposite reasons.</p>
+  <p><b>The minus sign.</b> <span class="mono">−log₂ p</span> and <span class="mono">log₂(1/p)</span> are the same number, and the second form is the one to hold in your head because it is visibly non-negative for <span class="mono">p ≤ 1</span>. If you ever compute a negative number of bits, you have dropped a sign or fed in a probability greater than one. The sign of the sum is the one thing to check before anything else: <span class="mono">H(p) ≥ 0</span> always.</p>
+  <p><b>"1.75 bits per symbol" does not mean any message costs a fraction of a bit.</b> It is an average over a long stream. A single "up" costs one whole bit; a thousand-instruction message costs about 1750 bits. Averages over symbols are allowed to be fractional in the same way that a household can have 2.3 children.</p>
+  <p><b>Entropy is a property of the distribution, not of the data.</b> A specific file does not "have" an entropy; a <em>source</em> does. And the entropy you compute depends entirely on the model you compute it under. English text scored as independent letters comes out around 4.1 bits per character; scored with real context — which is what Shannon's 1951 experiments measured, and what a language model does — it drops to roughly 1 bit per character. Same text, different <span class="mono">p</span>, wildly different floor. That is not a paradox; it is the whole game.</p>
+
+  <h2 id="further">Going deeper, verified</h2>
+  <ul class="readings">
+    <li><a href="https://youtu.be/l6DKRf-fAAM" target="_blank" rel="noopener">Reinventing Entropy — Compression is Intelligence, Part 1</a> — 3Blue1Brown · The full version of everything this page compresses; Grant links it from the description of Part 2.</li>
+    <li><a href="https://people.math.harvard.edu/~ctm/home/text/others/shannon/entropy/entropy.pdf" target="_blank" rel="noopener">A Mathematical Theory of Communication</a> — Claude Shannon (1948) · The source. Section 6 defines entropy; Theorem 9 is the source coding theorem that makes <span class="mono">H</span> a floor rather than a heuristic.</li>
+    <li><a href="https://en.wikipedia.org/wiki/Kraft%E2%80%93McMillan_inequality" target="_blank" rel="noopener">Kraft–McMillan inequality</a> — reference article · The budget constraint behind the whole page, including McMillan's 1956 result that unique decodability buys you nothing over prefix-freeness.</li>
+    <li><a href="https://www.inference.org.uk/mackay/itila/" target="_blank" rel="noopener">Information Theory, Inference, and Learning Algorithms</a> — David MacKay (2003) · Free full text. Chapter 5 does symbol codes and Kraft properly; Chapter 6 does arithmetic coding, with the model-is-a-compressor framing made explicit.</li>
+    <li><a href="https://www.cs.cmu.edu/~aarti/Class/10704/Intro_Arith_coding.pdf" target="_blank" rel="noopener">An Introduction to Arithmetic Coding</a> — Glen Langdon (1984) · How you actually cash in fractional bits: one interval, one number, no code book.</li>
+  </ul>
+
+  <h2 id="exercises">Exercises</h2>
+  <ol class="exercises">
+    <li><b>Check the floor by hand.</b> Take the four-symbol distribution ½, ¼, ⅛, ⅛ and try to beat 1.75 bits per symbol. Enumerate every assignment of prefix-free lengths whose Kraft sum is ≤ 1 — there are not many — and compute <span class="mono">Σ p·ℓ</span> for each. A good answer shows a specific alternative (say lengths 2, 2, 2, 2, or 1, 3, 3, 3) and its average, and states which constraint stopped you from doing better.</li>
+    <li><b>Reproduce the block-coding table.</b> For a uniform source over three symbols, build the Huffman code for blocks of <span class="mono">n = 1, 2, 3</span> and confirm the bits per symbol are 1.6667, 1.6111 and 1.6049 against <span class="mono">H = log₂ 3 = 1.5850</span>. A good answer also reports the Kraft sum at each <span class="mono">n</span> (it should be exactly 1) and extrapolates where <span class="mono">n = 6</span> would land.</li>
+    <li><b>Measure a real floor, twice.</b> Take a few hundred kilobytes of English prose. Compute the order-0 entropy from the character histogram, then the order-2 conditional entropy <span class="mono">H(x | previous two characters)</span>. Compare both to what <span class="mono">gzip</span> actually achieves on the same file, in bits per character. A good answer explains why gzip beats the order-0 number and why it does not reach the context-conditioned one — and says which of the three is "the entropy of English".</li>
+  </ol>
+
+  <div class="callout">Previous: <a class="lnk" href="p07.html">P7 Language trees and zipping: a family tree from gzip</a> · Next: <a class="lnk" href="p09.html">P9 Defining cross-entropy</a> · Back to the <a class="lnk" href="../index.html#cross-entropy">map</a>.</div>
+</main>
+<footer>Original explanation of 3Blue1Brown's "But what is cross-entropy? | Compression is Intelligence Part 2". The lesson and animations are Grant Sanderson's; this page links to them, it does not copy them.</footer>
+</body>
+</html>

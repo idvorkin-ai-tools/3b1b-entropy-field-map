@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>P12 Pre-training LLMs: the loss function, decoded — Entropy, mapped</title>
+<meta name="description" content="How a transformer's logits become a cross-entropy loss, why the one-hot target collapses the sum to −log q, and why that loss is literally a file size." />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="../paper.css" />
+</head>
+<body>
+<header class="bar"><div class="bar-in">
+  <div class="brand"><span class="dot"></span>ENTROPY&nbsp;//&nbsp;FIELD&nbsp;MAP</div>
+  <a class="back" href="../index.html#cross-entropy">← field map</a>
+</div></header>
+<main>
+  <div class="eyebrow"><span class="box bb mono">P12 · CROSS-ENTROPY</span><span class="mono">3Blue1Brown · 14:55–20:38 · 6 min</span></div>
+  <h1>Pre-training LLMs: the loss function, decoded</h1>
+  <div class="authors">Part 2 of the compression series — the "Pre-training LLMs" chapter, where cross-entropy stops being a story about robot instructions and becomes the number every language-model training run is minimising.</div>
+  <div class="paperlink" style="border-left-color:var(--def)"><span class="lbl">Watch</span><a href="https://youtu.be/GlYgs6v2YfU?t=895" target="_blank" rel="noopener">But what is cross-entropy? | Compression is Intelligence Part 2 — 3Blue1Brown, from 14:55 ↗</a></div>
+  <p class="mono" style="font-size:12.5px;color:var(--ink-dim)">Transcript: <a class="lnk" href="../transcripts/part2.html#s-895">this stretch, timestamped</a></p>
+
+  <div class="tldr"><b>TL;DR —</b> A transformer turns a prefix of text into a vector of logits, softmax turns those into a probability distribution <span class="mono">q</span> over the whole vocabulary, and the training signal is the one token that actually came next — a one-hot distribution <span class="mono">p</span>. Push that one-hot <span class="mono">p</span> through the cross-entropy formula and every term but one is multiplied by zero: the whole sum collapses to <span class="mono">−log q(true token)</span>. Average that over the corpus and you have the pre-training loss, exactly as reported in every scaling-law paper. The thing to remember is what that number <em>is</em>: measured in bits, it is the average size of the compressed file, per token. A loss of 2.0 nats means 2.885 bits per token, which means a trillion-token corpus squeezes into about 361 GB. Minimising the loss and building a better compressor are the same act.</div>
+
+  <p class="lead">The first half of Part 2 built cross-entropy out of a coding problem: you optimised a code for distribution <span class="mono">q</span>, reality turned out to be <span class="mono">p</span>, and <span class="mono">H(p,q) = Σᵢ pᵢ·log₂(1/qᵢ)</span> counted the bits you now spend per symbol. <a class="lnk" href="p11.html">P11</a> showed the 2002 language-trees result as a scruffy empirical instance of that same question. This page is where the series cashes its cheque. We take a language model — a black box with billions of knobs — and derive its training objective from scratch, and the formula that falls out is character-for-character the cross-entropy from the coding story. Grant deliberately arrives at it from the <em>other</em> direction, as "average information per token", so that the coincidence lands as a surprise. Our job here is to write out every step he gestures at on screen, especially the one-hot collapse, and then to convert the resulting number into bytes so the identity is not a slogan but an arithmetic fact. <a class="lnk" href="p13.html">P13</a> then asks the harder question this page leaves open: why the logarithm, and not some other decreasing function.</p>
+
+  <h2 id="outline">Outline, with timestamps</h2>
+  <ul class="outline">
+    <li><a href="https://youtu.be/GlYgs6v2YfU?t=895" target="_blank" rel="noopener">14:55</a> — The turn: from "how different are two languages" to "how different is a model's grasp of language from the real thing, as represented by training data".</li>
+    <li><a href="https://youtu.be/GlYgs6v2YfU?t=936" target="_blank" rel="noopener">15:36</a> — The object being trained: text splits into tokens; the model is a function from a token sequence to a probability distribution over every possible next token.</li>
+    <li><a href="https://youtu.be/GlYgs6v2YfU?t=996" target="_blank" rel="noopener">16:36</a> — Everything downhill is machinery: gradient descent and backpropagation are solved; define a good loss and you are essentially done.</li>
+    <li><a href="https://youtu.be/GlYgs6v2YfU?t=1028" target="_blank" rel="noopener">17:08</a> — The actual design question: what function of the model's outputs has "minimising it" mean the same thing as "getting better"?</li>
+    <li><a href="https://youtu.be/GlYgs6v2YfU?t=1060" target="_blank" rel="noopener">17:40</a> — The construction: for every prefix, read off the probability the model assigned to the token that really followed. All of them come out of a single forward pass.</li>
+    <li><a href="https://youtu.be/GlYgs6v2YfU?t=1092" target="_blank" rel="noopener">18:12</a> — Take <span class="mono">−log</span> of each of those probabilities: information content, i.e. surprise. A model that follows the plot is rarely surprised.</li>
+    <li><a href="https://youtu.be/GlYgs6v2YfU?t=1122" target="_blank" rel="noopener">18:42</a> — Why the shape is right — the vertical asymptote punishes confident wrongness brutally — and why "right shape" is not yet an argument for the logarithm specifically.</li>
+    <li><a href="https://youtu.be/GlYgs6v2YfU?t=1153" target="_blank" rel="noopener">19:13</a> — Units: ML uses natural log, not log base 2. A constant factor, absorbed into the learning rate — but not absorbed if you want to read the loss as bits.</li>
+    <li><a href="https://youtu.be/GlYgs6v2YfU?t=1185" target="_blank" rel="noopener">19:45</a> — "That's really all there is to pre-training": average the negative logs over every token in the corpus. Batching and optimisers are engineering, not objective.</li>
+    <li><a href="https://youtu.be/GlYgs6v2YfU?t=1217" target="_blank" rel="noopener">20:17</a> — The floor: minimise this and you push the loss down toward the entropy of language itself. And the name nobody explained yet — cross-entropy loss.</li>
+  </ul>
+
+  <h2 id="setup">The model is a function from prefix to distribution</h2>
+  <p>Strip away the architecture — Grant does exactly this at <a href="https://youtu.be/GlYgs6v2YfU?t=905" target="_blank" rel="noopener">15:05</a>, swapping the transformer animation (credited in the video description to Clayton Rabideau) for a featureless black box with a parameter dial on it. What survives the stripping is a type signature. Fix a vocabulary of <span class="mono">V</span> tokens — sub-word pieces, roughly 50,000 of them in a typical BPE tokeniser. Then a language model with parameters <span class="mono">θ</span> is a function</p>
+
+<pre class="code-block">f_θ :  (t₁, t₂, …, t_{k})  ⟼  z ∈ ℝⱽ          ("logits", raw unnormalised scores)
+q    =  softmax(z),      qᵢ = exp(zᵢ) / Σⱼ exp(zⱼ)
+so    qᵢ ≥ 0  and  Σᵢ qᵢ = 1                   (a genuine distribution over the vocabulary)</pre>
+
+  <p>Two things about the softmax are worth pausing on, because they matter later. First, it is the reason logits are <em>unbounded</em>: the network can output any real numbers it likes and still hand back a legal probability distribution, so the optimiser never has to fight a constraint. Second, softmax is shift-invariant — adding the same constant to every logit leaves <span class="mono">q</span> unchanged — which is why implementations subtract the max logit before exponentiating and why you should never write <span class="mono">log(softmax(z))</span> when <span class="mono">log_softmax(z)</span> exists.</p>
+
+  <p>Now the detail Grant mentions in passing at <a href="https://youtu.be/GlYgs6v2YfU?t=1060" target="_blank" rel="noopener">17:40</a> — that "the models are actually specifically designed to give you all of these probabilities on a single pass" — and which is worth spelling out, because it is the whole reason pre-training is economically possible. <em>(This paragraph is my elaboration; Grant states the fact but not the mechanism.)</em> A causal transformer applies an attention mask that forbids position <span class="mono">k</span> from attending to any position after <span class="mono">k</span>. So the output vector sitting above token <span class="mono">k</span> is a prediction made from the prefix <span class="mono">t₁…t_k</span> and nothing later. Feed in a window of <span class="mono">T</span> tokens and you do not get one training example — you get <span class="mono">T</span> of them, one per position, all for a single forward and backward pass. That is the difference between a loss you can evaluate on trillions of tokens and one you cannot.</p>
+
+  <h2 id="collapse">The one-hot collapse, written out</h2>
+  <p>Here is the step everyone nods past, and the reason this page exists.</p>
+
+  <p>At position <span class="mono">k</span> the model produces <span class="mono">q</span>, a distribution over all <span class="mono">V</span> tokens. What is the <em>target</em>? Not another distribution handed to us by an oracle. The corpus gives us exactly one fact: the token that actually came next. Call its index <span class="mono">c</span>. As a distribution over the vocabulary, that fact is a one-hot vector — probability 1 on the observed token, 0 on all <span class="mono">V−1</span> others:</p>
+
+<pre class="code-block">p = (0, 0, …, 0, 1, 0, …, 0)          pᵢ = 1 if i = c, else 0
+                    ↑
+                position c</pre>
+
+  <p>Substitute that <span class="mono">p</span> into the cross-entropy from the first half of the video and watch what happens:</p>
+
+<pre class="code-block">H(p, q)  =  Σᵢ  pᵢ · log(1/qᵢ)
+         =  Σᵢ  pᵢ · (−log qᵢ)
+
+         =  0·(−log q₁) + 0·(−log q₂) + … + 1·(−log q_c) + … + 0·(−log q_V)
+            └──────────────── every term with pᵢ = 0 vanishes ─────────────┘
+
+         =  −log q_c
+</pre>
+
+  <p>Every weight in the weighted sum is zero except one, and that one is 1. A sum over a fifty-thousand-token vocabulary collapses to a single lookup: <em>the negative log of the probability the model assigned to the token that actually appeared</em>. Nothing is approximated here; it is an exact identity, and it is why the loss you implement never looks like a sum over the vocabulary even though it is one.</p>
+
+  <p>This is also why the video can build the loss from the "average information per token" story at <a href="https://youtu.be/GlYgs6v2YfU?t=1092" target="_blank" rel="noopener">18:12</a> without ever writing <span class="mono">H(p,q)</span> on screen. The two descriptions are the same object; the cross-entropy form is simply the one that has not yet been simplified. Grant flags, right at the edge of this chapter, that reciting the collapse is an <em>unsatisfying</em> justification for the name — if the formula evaporates, why invoke it? That objection is the engine of <a class="lnk" href="p13.html">P13</a>, and it is a good one. Hold it.</p>
+
+  <div class="callout"><b>Carry this away.</b> There are two different distributions people call <span class="mono">p</span> in this story, and conflating them is the single most common confusion in the whole subject. The <em>per-token</em> <span class="mono">p</span> is one-hot: it says "this token, definitely". The <em>aggregate</em> <span class="mono">p</span> — the one that makes the name "cross-entropy" earned rather than decorative — is the empirical distribution over what follows a given context across the <em>whole corpus</em>: after "my name is", 0.4% Sarah, 0.3% David, and so on. Averaging the one-hot losses over many occurrences of the same context reconstructs the weighted sum against that aggregate <span class="mono">p</span>. Same number, two levels of description.</div>
+
+  <h2 id="average">Averaging: from one token to empirical cross-entropy</h2>
+  <p>One token gives one number. The loss is their mean over the corpus. With <span class="mono">N</span> tokens total and <span class="mono">c_k</span> the token observed at position <span class="mono">k</span>:</p>
+
+<pre class="code-block">L(θ)  =  (1/N) · Σ_{k=1..N}  −log q_θ( c_k | t₁ … t_{k−1} )</pre>
+
+  <p>Grant is blunt that this is the entire objective, batching and optimiser choice being engineering rather than mathematics:</p>
+
+  <blockquote class="q"><span>"And in some sense, that's it. That's really all there is to pre-training. All you're doing is looking through each token, taking the negative log of the probability the model gives to it, and averaging that over every token you see."</span><span class="cite">— Grant Sanderson, <a href="https://youtu.be/GlYgs6v2YfU?t=1185" target="_blank" rel="noopener">19:45</a></span></blockquote>
+
+  <p>Now the statistical reading, which the video implies at <a href="https://youtu.be/GlYgs6v2YfU?t=1217" target="_blank" rel="noopener">20:17</a> but does not formalise. <em>(The next two paragraphs are standard material I am adding; they are what makes the word "cross-entropy" literally rather than loosely correct.)</em> Treat the corpus as a sample drawn from some true distribution <span class="mono">P</span> — the actual statistics of the language you are trying to model. Then the sum above is a Monte Carlo estimate of an expectation:</p>
+
+<pre class="code-block">L(θ)  ≈  𝔼_{x ~ P} [ −log q_θ(x) ]  =  H(P, q_θ)          the cross-entropy of q_θ relative to P</pre>
+
+  <p>So the empirical loss is an <em>estimator</em> of a true cross-entropy, converging to it as the corpus grows, by the law of large numbers. And cross-entropy decomposes — this is Gibbs' inequality, the key property the first half of the video spent its time on:</p>
+
+<pre class="code-block">H(P, q)  =  H(P)  +  D(P‖q)          with  D(P‖q) ≥ 0,  equality iff q = P
+
+⟹  L(θ)  ≥  H(P)          the loss can never drop below the entropy of language itself</pre>
+
+  <p>That inequality is the floor Grant means by "hopefully getting it to approach something like the entropy of language". Training does not drive the loss to zero and should not be expected to; it drives the <em>excess</em> term <span class="mono">D(P‖q_θ)</span> — the KL divergence, the subject of the video's closing footnote — toward zero. What is left over is irreducible: the genuine unpredictability of text. Every reported pre-training loss you have ever seen is a measurement of "entropy of language plus how wrong my model still is", with no way, from the number alone, to tell you how much of it is which.</p>
+
+  <h2 id="units">Nats, bits, and perplexity</h2>
+  <p>At <a href="https://youtu.be/GlYgs6v2YfU?t=1153" target="_blank" rel="noopener">19:13</a> Grant notes that machine learning uses the natural log rather than log base 2, calls it a constant factor, and moves on — correctly, because for <em>optimisation</em> it is genuinely irrelevant. Scaling a loss by a constant scales every gradient by that same constant, and the learning rate absorbs it. (There is also a cleanliness argument: with softmax outputs and a natural log, the gradient of the loss with respect to the logits is exactly <span class="mono">∂L/∂z = q − p</span>. Base 2 gives you the same vector divided by <span class="mono">ln 2</span> — correct, just noisier to write. This gradient identity is my addition, and it is the practical reason frameworks fuse softmax and the log into one op.)</p>
+
+  <p>But the constant is <em>not</em> irrelevant for interpretation, and this is the unit bug that makes people misread the next section. A loss in <b>nats</b> becomes a loss in <b>bits</b> by dividing by <span class="mono">ln 2 ≈ 0.6931</span>:</p>
+
+<pre class="code-block">bits per token  =  nats per token / ln 2  =  nats × 1.4427</pre>
+
+  <p><b>Perplexity</b> is the third dialect: <span class="mono">PPL = exp(L)</span> for a loss in nats, equivalently <span class="mono">2^(bits per token)</span>. The reading is "the effective number of equally likely choices the model feels it is facing at each step". A perplexity of 7.4 does not mean the model believes there are 7.4 possible next tokens; it means its uncertainty is <em>as costly as</em> a uniform choice among 7.4 options. That reading is exact, because a uniform distribution over <span class="mono">n</span> outcomes has entropy <span class="mono">log n</span> on the nose.</p>
+
+  <p>A useful sanity check sits at the top of this table. A freshly initialised model outputs near-uniform logits, so its loss should start at about <span class="mono">ln V</span>. For a 50,257-token vocabulary that is 10.825 nats — and a training run whose first step does not land near that number has a bug, not a bad initialisation.</p>
+
+  <table class="kv">
+    <tr><th>loss (nats)</th><th>bits / token</th><th>perplexity</th><th>bits / char (≈4 ch·tok⁻¹)</th><th>1T-token corpus</th></tr>
+    <tr><td>10.825 <span class="mono">= ln V</span></td><td>15.617</td><td>50,257</td><td>3.90</td><td>1,952 GB</td></tr>
+    <tr><td>4.0</td><td>5.771</td><td>54.6</td><td>1.44</td><td>721 GB</td></tr>
+    <tr><td>3.0</td><td>4.328</td><td>20.1</td><td>1.08</td><td>541 GB</td></tr>
+    <tr><td>2.5</td><td>3.607</td><td>12.2</td><td>0.90</td><td>451 GB</td></tr>
+    <tr><td><b>2.0</b></td><td><b>2.885</b></td><td><b>7.39</b></td><td><b>0.72</b></td><td><b>361 GB</b></td></tr>
+    <tr><td>1.5</td><td>2.164</td><td>4.48</td><td>0.54</td><td>271 GB</td></tr>
+  </table>
+
+  <p>The "bits per character" column uses the common rule of thumb that English averages roughly 4 characters per token under a BPE tokeniser — treat it as an order-of-magnitude conversion, not a constant of nature, since it drifts with tokeniser and domain.</p>
+
+  <h2 id="filesize">The loss is a file size — with the arithmetic</h2>
+  <p>Take the row in bold and do the conversion by hand, because doing it yourself is what turns the claim from a slogan into a fact.</p>
+
+<pre class="code-block">loss                  =  2.0 nats / token
+bits per token        =  2.0 / 0.693147            =  2.885390 bits
+tokens in corpus      =  1 × 10¹²
+total bits            =  2.885390 × 10¹²           =  2.885 Tbit
+total bytes           =  2.885390 × 10¹² / 8       =  3.6067 × 10¹¹ bytes
+                                                   ≈  360.7 GB   (decimal, 10⁹ bytes)
+                                                   ≈  335.9 GiB  (binary, 2³⁰ bytes)</pre>
+
+  <p>So: a trillion-token corpus, encoded under a model whose pre-training loss is 2.0 nats, occupies about <b>361 GB</b>. Not "is analogous to" — occupies, to within a rounding error we can name. The bridge is arithmetic coding, which Part 3 builds and which achieves the information content of a message to within <em>fewer than 2 bits for the entire stream</em>, not per token. Spread over 10¹² tokens that overhead is around 2 × 10⁻¹² bits per token: unmeasurable. Sum-of-information is the file size.</p>
+
+  <p>Push the comparison one step further and it gets vivid. At the same ~4 characters per token, that corpus is about 4 × 10¹² characters — call it 4 TB of raw UTF-8. Compressing it to 361 GB is roughly an <b>11× reduction</b>, against the 3–4× that general-purpose <span class="mono">gzip</span> manages on English prose. This is exactly the gap that <a class="lnk" href="p11.html">P11</a>'s language-trees experiment was operating in the shallow end of: gzip is a very weak estimator of cross-entropy, so it is remarkable that it recovered anything about linguistic lineage at all. A trained language model is a very strong one.</p>
+
+  <p>Two independent yardsticks say the 0.72 bits-per-character figure is in the right neighbourhood, not fantasy. Shannon's 1951 experiments with human subjects guessing the next letter of English put the entropy of printed English somewhere in the range of roughly 0.6 to 1.3 bits per character. And the Hutter Prize — Marcus Hutter's standing competition to losslessly compress <span class="mono">enwik9</span>, a fixed 1 GB extract of English Wikipedia — currently sits at a record of 110,793,128 bytes, which is 0.886 bits per character. The premise stated on that page is the thesis of this whole video series in one line: being able to compress well is closely related to intelligence.</p>
+
+  <div class="callout"><b>The identity, stated plainly.</b> Pre-training loss, converted to bits, <em>is</em> bits-per-token of a compressed encoding of the training corpus. Gradient descent on cross-entropy is gradient descent on file size. Every scaling-law curve you have seen plotting loss against compute is, under a change of units, a plot of how much better a compressor you bought with those FLOPs. One honest caveat: those 361 GB are the size of the <em>encoded stream given the model</em>. If you want a self-contained archive, the model weights are the decoder and must be counted too — which is precisely why the Hutter Prize scores <span class="mono">S = S₁ + S₂</span>, compressor size plus archive size, and not just the archive.</div>
+
+  <h2 id="code">Six lines where the collapse is visible</h2>
+  <p>The identity is hardest to disbelieve when you can see it in the code. Both halves below compute the same number; the second is the first with the fused kernel unrolled so the vanished sum is legible.</p>
+
+<pre class="code-block">import torch, torch.nn.functional as F
+
+logits  = model(tokens[:, :-1])     # (B, T, V)  raw scores, one row per position
+targets = tokens[:, 1:]             # (B, T)     the token that ACTUALLY came next
+
+# The target distribution p at each position is one-hot on targets[b, t]:
+#     H(p, q) = sum_i p_i * (-log q_i)
+#             =    0 * (-log q_0) + ... + 1 * (-log q_c) + ... + 0 * (-log q_V)
+#             = -log q_c                     <-- every p_i = 0 term is annihilated
+# F.cross_entropy IS that collapse, fused with the softmax, reported in NATS:
+loss = F.cross_entropy(logits.reshape(-1, V), targets.reshape(-1))
+
+# The same thing, unrolled, so you can see the sum that is not there:
+logq   = torch.log_softmax(logits, dim=-1)          # log q  -- (B, T, V)
+picked = logq.gather(-1, targets.unsqueeze(-1))     # log q_c -- the Sigma already collapsed
+manual = -picked.mean()                             # nats per token
+assert torch.allclose(loss, manual, atol=1e-5)
+
+bits_per_token = manual.item() / 0.6931471805599453
+gigabytes      = bits_per_token * 1e12 / 8 / 1e9    # if the corpus were 1e12 tokens</pre>
+
+  <p>Note that <span class="mono">gather</span> — an index lookup — is standing in for a sum over 50,257 vocabulary entries. That substitution is legal only because of the algebra in the section above, and it is the reason the loss costs essentially nothing to evaluate once you have the logits. Note too that the framework never sees a one-hot vector: it takes an integer index. The one-hot <span class="mono">p</span> is a mathematical fiction that exists only to make the formula come out right, which is exactly the state of affairs that makes the "cross-entropy" name feel unearned — and exactly what <a class="lnk" href="p13.html">P13</a> repairs.</p>
+
+  <h2 id="stuck">Where people get stuck</h2>
+  <p><b>"Which distribution goes in which slot?"</b> <span class="mono">H(p,q)</span> is not symmetric and the asymmetry is not cosmetic. The <em>data</em> distribution <span class="mono">p</span> supplies the weights — the widths of the bars in Grant's diagram — and the <em>model</em> distribution <span class="mono">q</span> supplies the code lengths, the heights. Mnemonic: you weight by what reality does, and you pay by what your model believed. Swapping them here is not merely a different number, it is undefined: <span class="mono">H(q,p)</span> with a one-hot <span class="mono">p</span> asks for <span class="mono">log 0</span> at every token that did not occur, which is every token but one.</p>
+
+  <p><b>"If the formula collapses to −log q, why call it cross-entropy at all?"</b> This is the right objection and Grant raises it himself at the boundary of this chapter. The answer is not in the per-token algebra — there the name really is vacuous. It is in what happens when you average over many occurrences of the <em>same context</em>: the empirical frequencies of the different continuations reappear as genuine weights, and the aggregate loss is a real cross-entropy against a real non-degenerate distribution. That argument, plus a constrained-optimisation proof that the logarithm is forced, is <a class="lnk" href="p13.html">P13</a>.</p>
+
+  <p><b>"The loss went from 3.2 to 3.1. Is that a lot?"</b> In nats, a 3% relative move that looks like noise. Translate: perplexity falls from 24.5 to 22.2, and bits per token from 4.617 to 4.472 — the compressed corpus shrinks by exactly 3.125%. On a 1 TB archive that is 31 GB you no longer have to store. Log-scale losses compress the visual drama out of real gains; converting to bits or perplexity puts it back. This is also why loss curves are traditionally plotted on log axes.</p>
+
+  <p><b>"A model has 2.885 bits per token — but bits are integers."</b> They are not, for the same reason a fair three-sided die carries <span class="mono">log₂3 ≈ 1.585</span> bits. No individual token is written with 2.885 bits; the <em>stream</em> averages that, because arithmetic coding does not assign a codeword per symbol at all — it narrows a single interval over the whole message and emits the binary expansion of a point inside it. Fractional information is the norm, and integer-length codes (Huffman) are the special case that rounds up.</p>
+
+  <h2 id="further">Going deeper, verified</h2>
+  <ul class="readings">
+    <li><a href="https://arxiv.org/abs/2309.10668" target="_blank" rel="noopener">Language Modeling Is Compression</a> — Delétang, Ruoss, Duquenne, Catt, Genewein, Mattern, Grau-Moya, Wenliang, Aitchison, Orseau, Hutter &amp; Veness (2023) · The paper that makes this page's claim empirical: Chinchilla 70B used as a general-purpose compressor beats PNG on ImageNet patches (43.4% vs 58.5%) and FLAC on LibriSpeech audio (16.4% vs 30.3%). Marcus Hutter is a co-author, which is a pleasing closing of the loop.</li>
+    <li><a href="http://prize.hutter1.net/" target="_blank" rel="noopener">The Hutter Prize for Lossless Compression of Human Knowledge</a> — Marcus Hutter (launched 2006 at 50,000 €; expanded 2020 to 500,000 €) · Compress <span class="mono">enwik9</span>, a 1 GB extract of English Wikipedia, below the standing record of 110,793,128 bytes. Scoring is compressor size plus archive size, which is the honest version of "the loss is a file size".</li>
+    <li><a href="https://arxiv.org/abs/2001.08361" target="_blank" rel="noopener">Scaling Laws for Neural Language Models</a> — Kaplan, McCandlish, Henighan, Brown, Chess, Child, Gray, Radford, Wu &amp; Amodei (2020) · The canonical source for loss-vs-compute power laws. Read every y-axis in it as bits per token and the paper becomes a study of compression returns on capital.</li>
+    <li><a href="https://github.com/karpathy/nanoGPT" target="_blank" rel="noopener">nanoGPT</a> — Andrej Karpathy · The whole pre-training objective of this page is one call to <span class="mono">F.cross_entropy</span> in <span class="mono">model.py</span>. Worth reading precisely because there is so little of it. (The transformer animation in this stretch of the video is credited in the description as a nanoGPT animation by Clayton Rabideau.)</li>
+    <li><a href="https://pytorch.org/docs/stable/generated/torch.nn.functional.cross_entropy.html" target="_blank" rel="noopener">torch.nn.functional.cross_entropy</a> — PyTorch documentation · Confirms the two things people get wrong: it takes raw logits, not probabilities, and it takes integer class indices, not one-hot vectors. The docs also give the general weighted form that distillation uses.</li>
+  </ul>
+
+  <h2 id="exercises">Exercises</h2>
+  <ol class="exercises">
+    <li><b>Do the conversion cold</b> — A model reports a pre-training loss of 1.8 nats per token on a 300-billion-token corpus. Compute, without looking back: bits per token, perplexity, the size of the compressed corpus in GB, and the implied bits per character at 4 characters per token. A good answer states the unit convention it used for "GB" and lands near 2.597 bits/token, perplexity ≈ 6.05, ≈ 97.4 GB, ≈ 0.65 bits/char — and notices that this is below the Hutter Prize record's 0.886 bits/char, then explains why that is not a contradiction (different corpus, and the model weights are not counted).</li>
+    <li><b>Prove the collapse to yourself in code</b> — Build a random <span class="mono">(4, 8, 1000)</span> logit tensor and random integer targets. Verify that <span class="mono">F.cross_entropy</span> equals the manual <span class="mono">log_softmax</span>-then-<span class="mono">gather</span> version, and also equals the fully explicit version that materialises the one-hot <span class="mono">p</span> with <span class="mono">F.one_hot</span> and computes <span class="mono">−(p * log_softmax(z)).sum(-1).mean()</span>. Then backpropagate and check numerically that <span class="mono">∂L/∂z = (q − p)/(B·T)</span>. A good answer reports all three losses agreeing to <span class="mono">1e-6</span> and explains where the <span class="mono">B·T</span> divisor comes from.</li>
+    <li><b>Find the floor empirically</b> — Take any short English text and estimate its entropy two ways: (a) a zeroth-order character model — count letter frequencies and compute <span class="mono">H = Σ p·log₂(1/p)</span>; (b) <span class="mono">gzip</span> the file and report actual bits per character. A good answer gets roughly 4.1–4.2 bits/char for (a), something like 2–3 bits/char for (b) on a file large enough for gzip's window to matter, notes that both are far above Shannon's 0.6–1.3 bits/char estimate for English, and says precisely what each method fails to model that a transformer does not.</li>
+  </ol>
+
+  <div class="callout">Prev: <a class="lnk" href="p11.html">P11 Back to the language trees: what zip was measuring</a> · Next: <a class="lnk" href="p13.html">P13 Why this loss and not another one</a> · Back to the <a class="lnk" href="../index.html#cross-entropy">map</a>.</div>
+</main>
+<footer>Original explanation of 3Blue1Brown's "But what is cross-entropy? | Compression is Intelligence Part 2". The lesson and animations are Grant Sanderson's; this page links to them, it does not copy them.</footer>
+</body>
+</html>

@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>P05 The information in language: Shannon's guessing game — Entropy, mapped</title>
+<meta name="description" content="Why the entropy of English is only defined relative to a model, and how Shannon's guess-the-next-letter experiment turns a predictor into a code." />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="../paper.css" />
+</head>
+<body>
+<header class="bar"><div class="bar-in">
+  <div class="brand"><span class="dot"></span>ENTROPY&nbsp;//&nbsp;FIELD&nbsp;MAP</div>
+  <a class="back" href="../index.html#entropy">← field map</a>
+</div></header>
+<main>
+  <div class="eyebrow"><span class="box wb mono">P05 · REINVENTING ENTROPY</span><span class="mono">3Blue1Brown · 17:40–24:29 · 7 min</span></div>
+  <h1>The information in language: Shannon's guessing game</h1>
+  <div class="authors">Reinventing Entropy | Compression is Intelligence, Part 1 — the "Information of language" chapter</div>
+  <div class="paperlink" style="border-left-color:var(--off)"><span class="lbl">Watch</span><a href="https://youtu.be/l6DKRf-fAAM?t=1060" target="_blank" rel="noopener">Reinventing Entropy | Compression is Intelligence Part 1 — 3Blue1Brown, from 17:40 ↗</a></div>
+  <p class="mono" style="font-size:12.5px;color:var(--ink-dim)">Transcript: <a class="lnk" href="../transcripts/part1.html#s-1060">this stretch, timestamped</a></p>
+
+  <div class="tldr"><b>TL;DR —</b> The previous page defined the information of an event as <span class="mono">log₂(1/p)</span>. This one asks what happens when you point that definition at English, where probabilities are neither clean powers of two nor independent from one symbol to the next. Two things fall out. First, information is <em>additive along a message</em> — the chain rule multiplies conditional probabilities, the logarithm turns that product into a sum, so the compressed length of a whole passage is the sum of the per-letter information even when each term is fractional. Second, and more unsettling: there is no such thing as "the" probability of the next letter. Every number you can quote for the entropy of English is the score of some <em>model</em>, and better models score lower. Shannon's way out was to borrow the best language model he could reach — a human being — and have them guess the next letter. Remember the mechanism: <b>you never encode the letter, you encode the rank of the correct guess</b>, and that is a legitimate code because the decoder can replay the same predictor.</div>
+
+  <p class="lead">P04 landed the definition: the information of an outcome with probability <span class="mono">p</span> is <span class="mono">log₂(1/p)</span> bits, and in a perfect code that is exactly how many bits its code word gets. That was proved on a toy — a robot taking four moves with probabilities ½, ¼, ⅛, ⅛, all of them perfect powers of two, all of them independent. Real signals are not like that. This stretch of the video is the bridge from the toy to the thing Shannon actually cared about, natural language, and it is where the series earns its title: you cannot put a number on the compressibility of English without committing to a model of English, which is to say without committing to something that looks a great deal like understanding. P06 takes the same machinery and averages it, which is where <span class="mono">entropy</span> gets its formula.</p>
+
+  <h2 id="outline">Outline, with timestamps</h2>
+  <ul class="outline">
+    <li><a href="https://youtu.be/l6DKRf-fAAM?t=1060" target="_blank" rel="noopener">17:40</a> — The toy was too clean: dyadic probabilities and independence both fail for language.</li>
+    <li><a href="https://youtu.be/l6DKRf-fAAM?t=1125" target="_blank" rel="noopener">18:45</a> — Fractional bits demand a real interpretation. No letter gets a code word 4.19 bits long.</li>
+    <li><a href="https://youtu.be/l6DKRf-fAAM?t=1158" target="_blank" rel="noopener">19:18</a> — The chain rule: a message's probability is a product of conditionals.</li>
+    <li><a href="https://youtu.be/l6DKRf-fAAM?t=1190" target="_blank" rel="noopener">19:50</a> — Logs turn that product into a sum, so information adds along the message.</li>
+    <li><a href="https://youtu.be/l6DKRf-fAAM?t=1251" target="_blank" rel="noopener">20:51</a> — The load-bearing question: where do those conditional probabilities come from?</li>
+    <li><a href="https://youtu.be/l6DKRf-fAAM?t=1283" target="_blank" rel="noopener">21:23</a> — Shannon's first answer, n-gram tables scraped from books — and why they break.</li>
+    <li><a href="https://youtu.be/l6DKRf-fAAM?t=1344" target="_blank" rel="noopener">22:24</a> — The guessing game with Betty Shannon; the reduced text; the identical-twin decoder.</li>
+    <li><a href="https://youtu.be/l6DKRf-fAAM?t=1409" target="_blank" rel="noopener">23:29</a> — The 1951 redesign: record <em>how many</em> guesses, convert guess counts into bits.</li>
+    <li><a href="https://youtu.be/l6DKRf-fAAM?t=1440" target="_blank" rel="noopener">24:00</a> — What he was really doing: probing a black-box model of language. We now build those.</li>
+  </ul>
+
+  <h2 id="clean">Two things the robot example got for free</h2>
+  <p>Go back to the moon robot for a second and notice exactly which conveniences were doing the work. <b>Convenience one: every probability was a power of two.</b> ½, ¼, ⅛, ⅛ give informations of 1, 2, 3, 3 bits, whole numbers, so a prefix code could hit the bound exactly. <b>Convenience two: successive instructions were independent.</b> The distribution for the next symbol never changed, so one fixed code book served the whole stream.</p>
+  <p>Language breaks both, and it breaks the second one much more violently than the first (<a href="https://youtu.be/l6DKRf-fAAM?t=1093" target="_blank" rel="noopener">18:13</a>). The probability that the next character is <span class="mono">u</span> is small in general and close to 1 immediately after <span class="mono">q</span>. The probability that the next character is a space depends on how many letters you are into the current word. Every distribution in the stream is a different distribution, conditioned on everything already written. That is not a wrinkle to be smoothed away — it is the entire source of compression. A code that ignores context is leaving almost all of the redundancy on the table.</p>
+  <p>The first failure, non-dyadic probabilities, is the one Grant foregrounds visually: run a small character-level language model over a phrase, take <span class="mono">−log₂ p</span> of each letter's predicted probability, and you get numbers like 4.19 and 0.13 (<a href="https://youtu.be/l6DKRf-fAAM?t=1125" target="_blank" rel="noopener">18:45</a>). The vague reading is easy — surprising letters cost more. The exact reading is the thing to nail down, because there is obviously no code word that is 4.19 bits long, and there is certainly no code word that is a thin sliver of a bit.</p>
+
+  <h2 id="chainrule">The chain rule, and why the logarithm is the right lens</h2>
+  <p>The resolution is that <b>fractional information is a statement about whole messages, not about individual code words.</b> Write a message as a sequence of symbols <span class="mono">x₁ x₂ … xₙ</span>. Its probability factors — this is just the definition of conditional probability applied repeatedly, the chain rule (<a href="https://youtu.be/l6DKRf-fAAM?t=1158" target="_blank" rel="noopener">19:18</a>):</p>
+  <pre class="code-block"><code>P(x₁ x₂ … xₙ) = P(x₁) · P(x₂ | x₁) · P(x₃ | x₁x₂) · … · P(xₙ | x₁ … xₙ₋₁)</code></pre>
+  <p>Now take the information of the whole message and watch the logarithm do its one trick (<a href="https://youtu.be/l6DKRf-fAAM?t=1190" target="_blank" rel="noopener">19:50</a>):</p>
+  <pre class="code-block"><code>I(x₁ … xₙ) = log₂( 1 / P(x₁ … xₙ) )
+           = Σ  log₂( 1 / P(xₜ | x₁ … xₜ₋₁) )
+            t=1..n</code></pre>
+  <p>Products become sums. The per-letter numbers on screen are not code word lengths; they are <em>addends</em>. The message as a whole has an information content that is a perfectly ordinary real number, and Part 3 of the trilogy exhibits an algorithm — arithmetic coding — that encodes the passage in within a bit or two of that total, once, at the end. The rounding happens a single time for the whole message rather than 300 times for 300 letters, which is precisely why the fractional bookkeeping is worth doing.</p>
+  <p>This is the payoff Grant flags at <a href="https://youtu.be/l6DKRf-fAAM?t=1221" target="_blank" rel="noopener">20:21</a>: work one level of abstraction above bits, where information is continuous and additive, and only cash out into integers at the boundary with real hardware. It is the same move as working with real-valued probabilities instead of counts.</p>
+
+  <div class="callout off">Practitioner's version, and the sentence to carry into Part 2: <b>the cost of a text under a model is the sum of the per-token negative log-likelihoods, and that sum <em>is</em> a compressed size in bits.</b> Cross-entropy loss, averaged over a corpus, is literally bits-per-token of a compressor built from your model. Training a language model with that loss is training a compressor. No metaphor is involved.</div>
+
+  <h2 id="whose">Whose probabilities? Entropy is defined relative to a model</h2>
+  <p>Everything above assumed the conditional probabilities were handed to you. For the robot they were, by construction. For English, nobody hands them to you — and it is not even clear what it would mean for them to exist (<a href="https://youtu.be/l6DKRf-fAAM?t=1251" target="_blank" rel="noopener">20:51</a>).</p>
+  <blockquote class="q"><span>"All of this hinges on the question of how you know the probabilities for each successive letter."</span><span class="cite">— Grant Sanderson, <a href="https://youtu.be/l6DKRf-fAAM?t=1251" target="_blank" rel="noopener">20:51</a></span></blockquote>
+  <p>Shannon's first attack was pure statistics (<a href="https://youtu.be/l6DKRf-fAAM?t=1283" target="_blank" rel="noopener">21:23</a>): scan books, count what follows every occurrence of <span class="mono">th</span>, and use those frequencies as the conditional distribution. That gives the <b>N-gram entropies</b> <span class="mono">F₀, F₁, F₂, F₃, …</span>, where <span class="mono">F_N</span> is the conditional entropy of the next letter given the previous <span class="mono">N−1</span>. The true entropy of the language is the limit <span class="mono">H = limₙ F_N</span>, and the sequence is non-increasing: more context can only help.</p>
+  <p>The numbers below are from Shannon's 1951 paper, computed on a 26-letter alphabet and again on 27 symbols with the space included. I checked each one against the paper.</p>
+  <table class="kv">
+    <tr><th>Estimator</th><th>26 letters</th><th>27 (with space)</th><th>What it assumes</th></tr>
+    <tr><td><span class="mono">F₀</span> = log₂ A</td><td>4.70</td><td>4.76</td><td>all symbols equally likely</td></tr>
+    <tr><td><span class="mono">F₁</span></td><td>4.14</td><td>4.03</td><td>letter frequencies, no context</td></tr>
+    <tr><td><span class="mono">F₂</span></td><td>3.56</td><td>3.32</td><td>one letter of context</td></tr>
+    <tr><td><span class="mono">F₃</span></td><td>3.3</td><td>3.1</td><td>two letters of context</td></tr>
+    <tr><td><span class="mono">F_word</span></td><td>2.62</td><td>2.14</td><td>word frequencies</td></tr>
+    <tr><td><span class="mono">F₈</span> (1948, extrapolated)</td><td>≈ 2.3</td><td>—</td><td>statistics over ≤ 8 letters</td></tr>
+    <tr><td><span class="mono">H</span> from guessing, 100 letters of context</td><td>—</td><td>0.6 – 1.3</td><td>a fluent human reader</td></tr>
+  </table>
+  <p>Read that column top to bottom and the point of the whole series is sitting right there: <b>the number goes down as the model gets better, and nothing in the procedure ever tells you that you have reached the bottom.</b> Every model you can build gives you an <em>upper bound</em> on the entropy of the source and never a lower one. (That asymmetry has a name Grant has not introduced yet — it is Gibbs' inequality, the fact that cross-entropy is at least entropy, and it is exactly what P08 onward is about. Flagging it as my addition.)</p>
+  <p>And the n-gram route hits a wall (<a href="https://youtu.be/l6DKRf-fAAM?t=1313" target="_blank" rel="noopener">21:53</a>). To estimate <span class="mono">P(next | previous 20 letters)</span> by counting, you need to have seen that 20-letter string, and essentially every 20-letter string in this sentence has never appeared in any corpus. The counts are all zero. Worse, this is not a failure at the margins — <b>long contexts are precisely where prediction is easiest and where the compression is</b>, so the method fails hardest exactly where the payoff is largest.</p>
+
+  <h2 id="guessing">The guessing game: encode the rank, not the letter</h2>
+  <p>So Shannon stopped trying to build the model and went looking for one that already existed. The story Grant tells at <a href="https://youtu.be/l6DKRf-fAAM?t=1344" target="_blank" rel="noopener">22:24</a>: he opened a book and asked his wife Betty to guess the text one letter at a time, writing a dash when she was right and the true letter when she was wrong. The result is a <b>reduced text</b> — visibly shorter, and yet, he argued, carrying the same information.</p>
+  <p>The argument for "same information" is a decoding argument, and it is worth spelling out as an induction because it is the skeleton of every predictive compressor ever built. Fix a <em>deterministic</em> predictor <span class="mono">R</span> that maps a context to a ranked list of the 27 candidate next symbols, best guess first.</p>
+  <pre class="code-block"><code>ENCODE:  for t = 1 … n
+           order ← R(x₁ … xₜ₋₁)        # rank the candidates
+           emit rₜ = position of xₜ in order
+
+DECODE:  for t = 1 … n
+           order ← R(x₁ … xₜ₋₁)        # SAME context, already decoded
+           read rₜ ;  xₜ ← order[rₜ]</code></pre>
+  <p>Two properties make this a legitimate code, and neither of them is "the predictor is good".</p>
+  <ul>
+    <li><b>Causality.</b> The predictor at step <span class="mono">t</span> is fed only <span class="mono">x₁ … xₜ₋₁</span>, which the decoder has already reconstructed. The induction closes: if the decoder is correct through step <span class="mono">t−1</span>, it builds the identical ranked list and recovers <span class="mono">xₜ</span>.</li>
+    <li><b>Bijectivity.</b> For a fixed context, letter ↔ rank is a bijection on 27 items. Nothing is discarded; this is a re-encoding, not a lossy summary.</li>
+  </ul>
+  <p>That is what Grant's "identical replica of his wife" is doing (<a href="https://youtu.be/l6DKRf-fAAM?t=1377" target="_blank" rel="noopener">22:57</a>) — it is standing in for the shared deterministic predictor, and it is also the weak point of the first experiment, since a person genuinely does not guess the same way twice. Shannon patched this in the paper by noting that you could in principle ask the subject, for every possible N-gram, to write down their full ranked list once; that frozen table is a deterministic predictor, and the human is out of the loop.</p>
+  <p>Here is the crucial reframing. The reduced text is a stream over a <em>new alphabet</em> — the numbers 1 through 27 — with wildly skewed statistics: rank 1 is overwhelmingly common, high ranks are rare. All of the messy context-dependent structure of English has been pushed into the predictor and converted into a simple, context-free imbalance in the rank stream. A bad predictor still gives you a valid code, just one whose rank stream is nearly uniform and therefore incompressible. <b>Prediction quality shows up entirely as skew in the rank distribution.</b> That single sentence is the "prediction and compression are two sides of the same coin" claim, made concrete.</p>
+
+  <h2 id="bits">From guess counts to bits: what the 1951 paper actually measured</h2>
+  <p>Dashes tell you a guess was right but not how nearly right the wrong ones were. The redesign (<a href="https://youtu.be/l6DKRf-fAAM?t=1409" target="_blank" rel="noopener">23:29</a>) records the full rank: the subject keeps guessing until correct, and Shannon writes down the guess number. In one published sample of 102 symbols, the subject was right on the first guess 79 times, on the second 8 times, on the third 3 times, twice each on the fourth and fifth, and needed more than five guesses only 8 times. Roughly four characters in five were free.</p>
+  <p>Let <span class="mono">qᵢ</span> be the frequency of rank <span class="mono">i</span> in the reduced text. Shannon's bounds are:</p>
+  <pre class="code-block"><code>  27                                          27
+  Σ  i · (qᵢ − qᵢ₊₁) · log₂ i   ≤   F_N   ≤  − Σ  qᵢ · log₂ qᵢ
+ i=1                                         i=1</code></pre>
+  <p>The <b>upper bound</b> is a two-line argument. The rank stream is a symbol-by-symbol bijective recoding of the text, so it has the same entropy rate; and the entropy rate of any process is at most the plain entropy of its marginal distribution, because conditioning cannot increase entropy. So the zeroth-order entropy of the rank frequencies already bounds English from above — no modeling of the rank stream required. The <b>lower bound</b> is the harder half: the rank frequencies alone do not pin down the underlying conditional distributions, so Shannon asks which system of conditionals consistent with those frequencies has the <em>least</em> entropy. The answer is a mixture of uniform distributions — put weight <span class="mono">i·(qᵢ − qᵢ₊₁)</span> on "uniform over the top <span class="mono">i</span> candidates" — whose entropy is the left-hand sum. He notes honestly that this half is proved for an <em>ideal</em> predictor, while human guessers are not ideal, and argues the two errors roughly cancel.</p>
+  <p>Run those formulas on the 102-symbol sample above and you get roughly <span class="mono">0.7</span> and <span class="mono">1.2</span> bits per character (my calculation, treating the eight beyond-rank-five guesses as a lump at rank 6 — spreading them out raises the upper bound and barely moves the lower one). Shannon's own smoothed table, from 100 samples with 100 letters of context, gives <b>lower 0.6, upper 1.3 bits per character</b>, against 4.76 for the same 27 symbols chosen at random. His summary in the abstract is "of the order of one bit per letter", a redundancy of roughly 75%; Grant quotes about one bit per character at <a href="https://youtu.be/l6DKRf-fAAM?t=1821" target="_blank" rel="noopener">30:21</a>, which matches.</p>
+  <p>One citation note. Grant calls this "his 1950 paper". The manuscript was received in September 1950, but it was published in the <em>Bell System Technical Journal</em> vol. 30 in January 1951 and is universally cited as Shannon 1951 — worth knowing if you go looking for it.</p>
+
+  <h2 id="modern">The same construction, with a machine in the chair</h2>
+  <p>The last beat of this chapter is the one the whole trilogy hangs on (<a href="https://youtu.be/l6DKRf-fAAM?t=1440" target="_blank" rel="noopener">24:00</a>).</p>
+  <blockquote class="q"><span>"He wasn't just doing pure data analysis looking through books. He was trying to probe at an underlying model of language, namely the interviewee's brain."</span><span class="cite">— Grant Sanderson, <a href="https://youtu.be/l6DKRf-fAAM?t=1440" target="_blank" rel="noopener">24:00</a></span></blockquote>
+  <p>Swap the human for a neural network and nothing about the construction changes. The network is a deterministic, causal, context-conditioned distribution over next symbols; encoder and decoder both run it; you code the outcome against its predictions. Modern systems code against the probabilities directly with arithmetic coding rather than against ranks, which is strictly better — ranks throw away the difference between a 0.99 first guess and a 0.35 first guess — but the correctness argument is the identical induction.</p>
+  <p>Two verified data points for scale, and one caveat about comparing them. Working with a 27-symbol normalization of <em>Pride and Prejudice</em> (692,508 characters, letters and spaces only), I measured the following on this machine:</p>
+  <table class="kv">
+    <tr><th>Method</th><th>bits / character</th><th>Note</th></tr>
+    <tr><td>uniform over 27 symbols</td><td>4.755</td><td>log₂ 27</td></tr>
+    <tr><td>letter frequencies (<span class="mono">F₁</span>)</td><td>4.10</td><td>Shannon's 27-letter <span class="mono">F₁</span>: 4.03</td></tr>
+    <tr><td>digram model (<span class="mono">F₂</span>)</td><td>3.31</td><td>Shannon's: 3.32</td></tr>
+    <tr><td><span class="mono">gzip -9</span></td><td>2.66</td><td>LZ77 + Huffman</td></tr>
+    <tr><td><span class="mono">xz -9e</span></td><td>2.16</td><td>LZMA2</td></tr>
+    <tr><td><span class="mono">bzip2 -9</span></td><td>1.86</td><td>BWT + entropy coding</td></tr>
+  </table>
+  <p>Reproducing Shannon's 1951 letter-frequency numbers to within 0.02 bits off a single novel is a nice sanity check on the whole apparatus. And note where the general-purpose compressors sit: comfortably below the digram model, comfortably above a human reader.</p>
+  <p>For the machine side, Delétang et al. (2023) evaluate large models as literal lossless compressors on <span class="mono">enwik9</span>. In their Table 1, <span class="mono">gzip</span> reaches 32.3% of raw size (2.58 bits per byte) and Chinchilla 70B reaches 8.3% (0.66 bits per byte) — below Shannon's human estimate, on the same order. The caveat is real: <span class="mono">enwik9</span> is raw Wikipedia markup measured per <em>byte</em>, not clean printed English measured per <em>letter</em>, so the two numbers are cousins, not twins. And the same table's "adjusted" column, which charges the compressor for shipping the model itself, sends Chinchilla's 8.3% past 14000% — a useful antidote to any claim that a language model has "beaten" the entropy of English.</p>
+
+  <h2 id="stuck">Where people get stuck</h2>
+  <p><b>"The entropy of English is 1 bit per character."</b> It is not a constant of nature; it is a measurement of one model class on one kind of text with one alphabet. Shannon's number is 27 symbols, literary English, ~100 letters of context, one era, a handful of subjects, 100 samples per column. Bits per <em>letter</em>, bits per <em>byte</em>, and bits per <em>token</em> are three different units, and papers quietly switch between them.</p>
+  <p><b>"A letter can't cost 4.19 bits."</b> Correct, and nobody claims a code word of that length exists. Information is additive over a message; the sum is a real number; the rounding to whole bits happens once, for the message, not once per symbol. Arithmetic coding is the constructive proof, and its overhead is a couple of bits for the entire passage.</p>
+  <p><b>"Encoding the rank feels like cheating — where did the dictionary go?"</b> Nowhere: both sides must hold the predictor, and it is not free. For a fixed predictor amortized over a long stream, the cost per symbol vanishes; for a 70-billion-parameter model and a one-gigabyte file, it does not, which is what the "adjusted compression rate" accounting above measures. The principled version of this bookkeeping is minimum description length: total cost = model size + data cost under the model.</p>
+  <p><b>"Better models keep giving lower numbers — when do we stop?"</b> You do not get to stop, and that is the philosophical content of the chapter. Any model gives an upper bound on the source entropy; nothing certifies you have reached the floor. Measuring the entropy of a language is therefore an open-ended search for a better model of it, which is why the compression question and the intelligence question refuse to come apart.</p>
+
+  <h2 id="further">Going deeper, verified</h2>
+  <ul class="readings">
+    <li><a href="https://www.princeton.edu/~wbialek/rome/refs/shannon_51.pdf" target="_blank" rel="noopener">Prediction and Entropy of Printed English</a> — C. E. Shannon, <em>Bell System Technical Journal</em> 30 (1951), pp. 50–64 · The primary source for everything on this page: the guessing protocol, Table I of guess frequencies, and the bounds derivation. Short and readable.</li>
+    <li><a href="https://colah.github.io/posts/2015-09-Visual-Information/" target="_blank" rel="noopener">Visual Information Theory</a> — Christopher Olah (2015) · Linked in the video description as the origin of Grant's way of drawing entropy; the best visual companion to the next few pages.</li>
+    <li><a href="https://people.math.harvard.edu/~ctm/home/text/others/shannon/entropy/entropy.pdf" target="_blank" rel="noopener">A Mathematical Theory of Communication</a> — C. E. Shannon (1948) · Where <span class="mono">F_N</span>, redundancy, and the ≈2.3 bits-per-letter estimate come from, and where the noiseless coding theorem of P06 lives.</li>
+    <li><a href="https://arxiv.org/abs/2309.10668" target="_blank" rel="noopener">Language Modeling Is Compression</a> — Delétang et al. (2023) · Runs Shannon's construction with modern models: arithmetic coding driven by Chinchilla, with the raw-versus-adjusted compression accounting quoted above.</li>
+    <li><a href="http://mattmahoney.net/dc/text.html" target="_blank" rel="noopener">Large Text Compression Benchmark</a> — Matt Mahoney · The long-running leaderboard for compressing <span class="mono">enwik9</span>, where predictive-model compressors have been quietly grinding toward Shannon's estimate for two decades.</li>
+  </ul>
+
+  <h2 id="exercises">Exercises</h2>
+  <ol class="exercises">
+    <li><b>Rebuild Shannon's table.</b> Take any public-domain novel, lowercase it, keep only <span class="mono">a–z</span> and space, and collapse runs of whitespace. Compute <span class="mono">F₁ = −Σ p(c)·log₂ p(c)</span> and <span class="mono">F₂ = H(digrams) − F₁</span>. A good answer reports both numbers to two decimals, states the character count, and compares against Shannon's 27-symbol 4.03 and 3.32. You should land within about 0.1 bits; if you are near 4.7 you forgot to include the space, and if you are near 4.2 you excluded it.</li>
+    <li><b>Compute the bounds by hand.</b> Shannon's 102-symbol sample gave guess-rank counts 79, 8, 3, 2, 2, with 8 symbols needing more than five guesses. Normalize to frequencies <span class="mono">qᵢ</span> and evaluate both sides of <span class="mono">Σ i(qᵢ − qᵢ₊₁)log₂ i ≤ F_N ≤ −Σ qᵢ log₂ qᵢ</span>. A good answer gets roughly 0.7 and 1.2 bits per character, and says explicitly what assumption it made about the eight tail symbols and which direction that assumption biases each bound.</li>
+    <li><b>Build the rank codec.</b> Train a trigram table on one book, then encode a second book as a stream of guess-ranks under that predictor. Gzip the rank stream and gzip the original text, and compare bits per character. A good answer reports both numbers, confirms that decoding reproduces the input exactly, and states the causality invariant that makes the decoder work — that the predictor at step <span class="mono">t</span> sees only symbols already emitted.</li>
+  </ol>
+
+  <div class="callout">Previous: <a class="lnk" href="p04.html">P04 Defining information: why log(1/p) and nothing else</a> · Next: <a class="lnk" href="p06.html">P06 Defining entropy</a> · Back to the <a class="lnk" href="../index.html#entropy">map</a>.</div>
+</main>
+<footer>Original explanation of 3Blue1Brown's "Reinventing Entropy | Compression is Intelligence Part 1". The lesson and animations are Grant Sanderson's; this page links to them, it does not copy them.</footer>
+</body>
+</html>

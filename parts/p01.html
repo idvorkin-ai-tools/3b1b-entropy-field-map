@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>P01 "Compression is intelligence" — what the claim means — Entropy, mapped</title>
+<meta name="description" content="Why a next-token predictor and a file compressor are the same object, how arithmetic coding converts one into the other, and what survives of the slogan." />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="../paper.css" />
+</head>
+<body>
+<header class="bar"><div class="bar-in">
+  <div class="brand"><span class="dot"></span>ENTROPY&nbsp;//&nbsp;FIELD&nbsp;MAP</div>
+  <a class="back" href="../index.html#entropy">← field map</a>
+</div></header>
+<main>
+  <div class="eyebrow"><span class="box wb mono">P01 · REINVENTING ENTROPY</span><span class="mono">3Blue1Brown · 00:00–03:28 · 3 min</span></div>
+  <h1>"Compression is intelligence" — what the claim means</h1>
+  <div class="authors">Reinventing Entropy | Compression is Intelligence Part 1 — the opening thesis, before the maths starts</div>
+  <div class="paperlink" style="border-left-color:var(--off)"><span class="lbl">Watch</span><a href="https://youtu.be/l6DKRf-fAAM?t=0" target="_blank" rel="noopener">Reinventing Entropy | Compression is Intelligence Part 1 — 3Blue1Brown, from 00:00 ↗</a></div>
+  <p class="mono" style="font-size:12.5px;color:var(--ink-dim)">Transcript: <a class="lnk" href="../transcripts/part1.html#s-0">this stretch, timestamped</a></p>
+
+  <div class="tldr"><b>TL;DR —</b> The question is whether text has a compression floor, and the answer turns out to run through machine learning. A model that assigns probabilities to the next token can be turned mechanically into a compressor whose output length is the sum of its per-token surprises, and a compressor can be turned back into a model — so "predict the next token well" and "make this file as small as possible" are one problem written twice. That is the defensible core of the slogan "compression is intelligence"; the slogan itself overreaches, because compression is always measured relative to a decompressor, and a decompressor can hide the answers. What to remember: <span class="mono">−log₂ p</span> is simultaneously a code length and a loss, and everything else in this series is bookkeeping on that one identity.</div>
+
+  <p class="lead">This is the first three and a half minutes of a three-part series, and it does nothing but set the stakes. There is no maths in it yet. What it does instead is stake a claim that the rest of the series has to earn: that the cross-entropy loss used to pre-train large language models is not an arbitrary engineering choice but the same quantity Claude Shannon arrived at in 1948 when he asked how small a message could possibly get. Everything downstream — <a class="lnk" href="p02.html">the robot on the moon</a>, prefix codes, the definition of information, entropy, cross-entropy, KL divergence — is the argument for that claim. This page is the claim itself, plus the piece of machinery Grant promises and defers: the actual bridge between prediction and compression.</p>
+
+  <h2 id="outline">Outline, with timestamps</h2>
+  <ul class="outline">
+    <li><a href="https://youtu.be/l6DKRf-fAAM?t=0" target="_blank" rel="noopener">00:00</a> — The setup: ASCII spends 8 bits a character, cleverness gets you to about 4, and smarter schemes go lower still.</li>
+    <li><a href="https://youtu.be/l6DKRf-fAAM?t=32" target="_blank" rel="noopener">00:32</a> — But is there a floor? The question dates to Shannon in the 1940s, and the method matters more than the number.</li>
+    <li><a href="https://youtu.be/l6DKRf-fAAM?t=63" target="_blank" rel="noopener">01:03</a> — The hinge: LLM pre-training is next-token prediction under cross-entropy loss, and prediction and compression are mathematically equivalent.</li>
+    <li><a href="https://youtu.be/l6DKRf-fAAM?t=93" target="_blank" rel="noopener">01:33</a> — So pre-training can be reframed as building the best possible text compressor — which is where "compression is intelligence" comes from.</li>
+    <li><a href="https://youtu.be/l6DKRf-fAAM?t=123" target="_blank" rel="noopener">02:03</a> — The hedge: the slogan is hard to judge, the safer claim is weaker, and this is the first of a trilogy aimed at the noiseless coding theorem.</li>
+    <li><a href="https://youtu.be/l6DKRf-fAAM?t=156" target="_blank" rel="noopener">02:36</a> — Method: information and entropy will be <em>discovered</em>, not defined, because a definition handed over early spoils the story.</li>
+    <li><a href="https://youtu.be/l6DKRf-fAAM?t=188" target="_blank" rel="noopener">03:08</a> — The punchline to watch for: you cannot answer the compression question without engaging some notion of intelligence. Then, a warm-up.</li>
+  </ul>
+
+  <h2 id="floor">The question: does text have a floor?</h2>
+
+  <p>Start with the crude baseline. ASCII assigns every character a fixed-width code; in practice each one occupies a full byte, so plain English text costs 8 bits a character. That is obviously wasteful, because the characters are not equally likely — <span class="mono">e</span> and space dominate, <span class="mono">z</span> and <span class="mono">q</span> barely appear — and a code that gives common characters short strings and rare characters long ones does better. Grant's figure of roughly four bits per character is the right order for that kind of scheme: a Huffman code built on English letter frequencies alone lands a little above four bits per character.</p>
+
+  <p><i>My addition, since the video moves past it quickly:</i> ASCII is properly a 7-bit code padded to 8 for byte alignment, so one of those eight bits is pure padding before you have done any information theory at all. And frequency is only the first move. Real compressors go further by exploiting <em>context</em> — <span class="mono">u</span> after <span class="mono">q</span> is nearly free, and the fourth occurrence of "entropy" in a paragraph is nearly free — which is exactly the door through which language models will eventually walk. <span class="mono">gzip</span> reaches roughly 2.5–3 bits per byte on English by pattern-matching alone, with no notion of what the text means.</p>
+
+  <p>So the sequence 8 → 4 → 3 → … invites the obvious question <a class="lnk" href="https://youtu.be/l6DKRf-fAAM?t=32" target="_blank" rel="noopener">at 00:32</a>: does this bottom out? A floor is a strange thing to hope for, because it would have to be a statement about English itself rather than about any particular algorithm, and it is not obvious at the outset that such a statement can even be phrased. Shannon's answer is that it can — and that the floor is a property of a <em>probability distribution</em>, not of a language.</p>
+
+  <h2 id="bridge">Prediction and compression are the same object</h2>
+
+  <p>Here is the load-bearing claim of the whole series, stated <a class="lnk" href="https://youtu.be/l6DKRf-fAAM?t=63" target="_blank" rel="noopener">at 01:03</a> and then deliberately postponed:</p>
+
+  <blockquote class="q"><span>"…one of the conclusions of information theory says that prediction and compression are mathematically equivalent. They turn out to be two sides of the same coin."</span><span class="cite">— Grant Sanderson, <a href="https://youtu.be/l6DKRf-fAAM?t=63" target="_blank" rel="noopener">01:03</a></span></blockquote>
+
+  <p>Grant says "later I'll explain exactly how that works," and Part 2 does. But the mechanism is worth having in hand now, because once you see it the rest of the series stops being a sequence of definitions and becomes a single argument. The bridge is <b>arithmetic coding</b> — discovered independently by Jorma Rissanen and Richard Pasco in 1976, and made practical by Witten, Neal and Cleary in 1987 — and it runs in both directions.</p>
+
+  <p><b>Direction one: model → compressor.</b> A language model is a function that takes a context and returns a probability distribution over the next token. Nothing more. Call the message <span class="mono">x₁ x₂ … xₙ</span>. By the chain rule, the model assigns the whole message the probability</p>
+
+  <pre class="code-block"><code>P(x₁…xₙ) = P(x₁) · P(x₂ | x₁) · P(x₃ | x₁x₂) · … · P(xₙ | x₁…xₙ₋₁)</code></pre>
+
+  <p>and taking <span class="mono">−log₂</span> of both sides turns that product into a sum:</p>
+
+  <pre class="code-block"><code>−log₂ P(x₁…xₙ)  =  Σᵢ −log₂ P(xᵢ | x₁…xᵢ₋₁)</code></pre>
+
+  <p>The right-hand side is, term for term, the cross-entropy loss the model is scored on during training. The left-hand side is a number of bits. That is the whole coincidence, and it is not a coincidence: the loss <em>is</em> a code length, measured in bits, of the training corpus under the model.</p>
+
+  <p>Arithmetic coding is the construction that collects those bits. Keep a live interval, starting at <span class="mono">[0, 1)</span>. To encode the first token, chop the interval into pieces whose widths are the model's predicted probabilities, and keep the piece belonging to the token that actually occurred. Feed that token back into the model, get a new distribution, chop the <em>surviving</em> interval the same way, keep the right piece, and repeat. After <span class="mono">n</span> tokens the surviving interval has width exactly <span class="mono">P(x₁…xₙ)</span> — each step multiplied the width by one conditional probability. Then transmit the shortest binary fraction that lands inside it.</p>
+
+  <p>Pinning down a point inside an interval of width <span class="mono">w</span> takes about <span class="mono">log₂(1/w)</span> bits, and the standard bound — MacKay states it as the message length always landing within two bits of the information content of the entire source string — is that arithmetic coding never spends more than <span class="mono">−log₂ P(x₁…xₙ) + 2</span> bits <em>in total</em>. Note where the "+2" sits: it is a constant for the whole message, not a penalty per symbol. That is precisely what a per-symbol code like Huffman cannot do, because a per-symbol code must round every code word up to a whole number of bits.</p>
+
+  <p>A small worked example, using a made-up model over a five-token message. The probabilities are the model's conditional predictions at each step:</p>
+
+  <table class="kv">
+    <tr><th>step</th><th>token</th><th>model p</th><th>ideal bits <span class="mono">−log₂ p</span></th><th>rounded up <span class="mono">⌈−log₂ p⌉</span></th></tr>
+    <tr><td>1</td><td><span class="mono">the</span></td><td>0.20</td><td>2.322</td><td>3</td></tr>
+    <tr><td>2</td><td><span class="mono">cat</span></td><td>0.05</td><td>4.322</td><td>5</td></tr>
+    <tr><td>3</td><td><span class="mono">sat</span></td><td>0.02</td><td>5.644</td><td>6</td></tr>
+    <tr><td>4</td><td><span class="mono">on</span></td><td>0.30</td><td>1.737</td><td>2</td></tr>
+    <tr><td>5</td><td><span class="mono">the</span></td><td>0.60</td><td>0.737</td><td>1</td></tr>
+    <tr><td></td><td><b>whole message</b></td><td><b>3.6 × 10⁻⁵</b></td><td><b>14.762</b></td><td><b>17</b></td></tr>
+  </table>
+
+  <p>The message probability in the bottom row is the product <span class="mono">0.20 · 0.05 · 0.02 · 0.30 · 0.60 = 3.6 × 10⁻⁵</span>, and <span class="mono">−log₂(3.6 × 10⁻⁵) = 14.762</span>, which is exactly the column sum — the chain rule and the log doing their job. Arithmetic coding sends this in at most 17 bits; per-symbol rounding also costs 17, so on five tokens it is a tie. The point is what happens at length: on a 5,000-token document the rounding tax is up to 5,000 wasted bits while arithmetic coding still pays 2. Fractional bits only mean anything in aggregate, and arithmetic coding is the machine that lets you spend them.</p>
+
+  <p><b>Direction two: compressor → model.</b> The converse is less often spelled out and is half of why the equivalence is interesting. Suppose someone hands you a black-box lossless compressor and lets you call it. Write <span class="mono">L(s)</span> for the length in bits of its output on string <span class="mono">s</span>. Then the compressor already implies a next-token distribution:</p>
+
+  <pre class="code-block"><code>q(x | context)  ∝  2^−( L(context · x) − L(context) )</code></pre>
+
+  <p>In words: the model's opinion about token <span class="mono">x</span> is read off from how many <em>extra</em> bits the compressor spends when you append <span class="mono">x</span>. A token the compressor finds cheap is a token it expected. The proportionality sign is doing real work — a general compressor's implied weights need not sum to one, though because it is uniquely decodable they can never sum to more than one, which is Kraft's inequality and shows up again in <a class="lnk" href="p02.html">P2</a>. Normalise over the vocabulary and you have a genuine probability distribution extracted from a program that was never told it was a model.</p>
+
+  <div class="callout">The thing to carry away: <b>every lossless compressor is a probabilistic model of its input, and every probabilistic model is a lossless compressor.</b> "How well does this model understand text" and "how small can it make this file" are not analogous questions, they are the same question in two notations, and arithmetic coding is the translation. This is why a claim about compression can be a claim about intelligence at all — and it is also why the slogan needs the fine print in the next section.</div>
+
+  <h2 id="loss">The loss number on your screen is a compression rate</h2>
+
+  <p><i>This section is my addition; the video reaches it in Part 2.</i> Training logs report cross-entropy loss in <b>nats</b> per token, because the implementation takes a natural log. Divide by <span class="mono">ln 2 ≈ 0.6931</span> and you have bits per token, and bits per token is a file size. A model sitting at a loss of <span class="mono">2.0</span> nats/token is compressing its evaluation text to <span class="mono">2.0 / 0.6931 = 2.885</span> bits per token. If the tokeniser averages 4 bytes to the token, that is <span class="mono">2.885 / 4 = 0.72</span> bits per byte — against 8 bits per byte for raw storage and roughly 2.5–3 for <span class="mono">gzip</span>.</p>
+
+  <p>Do that arithmetic once by hand and the equivalence stops being philosophical: a loss curve going down is a file getting smaller, in the same units. It also explains why compression benchmarks are a live evaluation of language models rather than a curiosity — they are the training objective, reported without the log.</p>
+
+  <h2 id="slogan">Why the slogan is slippery, and what survives</h2>
+
+  <p>Grant states the strong version and immediately backs off it <a class="lnk" href="https://youtu.be/l6DKRf-fAAM?t=93" target="_blank" rel="noopener">at 01:33</a>, which is the correct move:</p>
+
+  <blockquote class="q"><span>"The safer claim would be that the mathematical theory of compression is bizarrely relevant to artificial intelligence."</span><span class="cite">— Grant Sanderson, <a href="https://youtu.be/l6DKRf-fAAM?t=123" target="_blank" rel="noopener">02:03</a></span></blockquote>
+
+  <p>Three things go wrong with the strong reading, and naming them now keeps the rest of the series honest.</p>
+
+  <p><b>Compression is only defined relative to a decompressor.</b> There is no such thing as "the size of a compressed file" on its own; there is the size of the file <em>plus</em> the program needed to unpack it. Otherwise the cheat is trivial — write a decompressor that already contains the corpus and ship a zero-byte archive. Any benchmark that wants compression to mean something must therefore measure the <b>self-extracting archive</b>: compressed data and decompressor together. The <a href="http://prize.hutter1.net/" target="_blank" rel="noopener">Hutter Prize</a> is the standing example, and it is worth knowing precisely what it measures. Announced by Marcus Hutter in 2006 and expanded on 21 February 2020, it pays for losslessly compressing a fixed snapshot of English Wikipedia — originally <span class="mono">enwik8</span>, the first 100 MB, now <span class="mono">enwik9</span>, the first 10⁹ bytes. What is scored is the combined size <span class="mono">S</span> of the compressed archive <em>and</em> the decompressor that unpacks it, run under fixed time and memory limits. Against a standing record <span class="mono">L</span>, the award is <span class="mono">500,000 € × (1 − S/L)</span>, with a 1% improvement the minimum admissible claim. The eighth and current record, set by Kaido Orav and Byron Knoll in September 2024 with a decompressor called <span class="mono">fx2-cmix</span>, is 110,793,128 bytes — about 0.89 bits per byte of original Wikipedia. The prize's own stated rationale is the slogan under discussion: that being able to compress well is closely related to intelligence, and that a program which beats its predecessors on this file likely has to be smarter.</p>
+
+  <p><b>A file size is a statement about one corpus, not about generality.</b> Lossless compression of a fixed snapshot rewards modelling the distribution you were handed. It says nothing directly about behaviour off that distribution, about planning, tool use, or calibration under shift. A system can be a superb compressor of Wikipedia-as-of-2006 and be useless at anything you would want an agent to do. The implication runs one way and weakly: good compression requires good modelling; good modelling is necessary, not sufficient, for the things we call intelligence.</p>
+
+  <p><b>The interesting version of the claim is older than machine learning.</b> Strip out the marketing and what remains is Occam's razor with units attached: the shortest program that outputs your data is your best explanation of it, and finding short programs is what understanding <em>is</em>. That is the Kolmogorov-complexity and minimum-description-length tradition; Legg and Hutter's <a href="https://arxiv.org/abs/0712.3329" target="_blank" rel="noopener">"Universal Intelligence"</a> (2007) is the most serious attempt to turn it into an actual definition, and Ilya Sutskever's 2023 Simons Institute talk <a href="https://simons.berkeley.edu/talks/ilya-sutskever-openai-2023-08-14" target="_blank" rel="noopener">"An Observation on Generalization"</a> is the most-cited modern restatement. It is also why the claim resists falsification in its strong form — Kolmogorov complexity is uncomputable — and why the field settles for the safer version Grant states: not that compression <em>is</em> intelligence, but that the mathematics of compression keeps turning up, unbidden, in the mathematics of learning.</p>
+
+  <div class="callout off">Practical version of all three points: <b>if someone quotes you a compression ratio, ask what is in the decompressor.</b> The same discipline applies to a language model quoted at some bits-per-byte — ask whether the evaluation text was in the training set, which is the same cheat wearing different clothes.</div>
+
+  <h2 id="method">Definitions as the residue of insight</h2>
+
+  <p><a class="lnk" href="https://youtu.be/l6DKRf-fAAM?t=156" target="_blank" rel="noopener">At 02:36</a> Grant explains the pedagogical shape of the next half hour, and it is worth flagging because it is unusual enough to be disorienting if you are not expecting it:</p>
+
+  <blockquote class="q"><span>"…great definitions are often the residue of some kind of insight."</span><span class="cite">— Grant Sanderson, <a href="https://youtu.be/l6DKRf-fAAM?t=156" target="_blank" rel="noopener">02:36</a></span></blockquote>
+
+  <p>A normal treatment opens with <span class="mono">H(p) = Σ p(x)·log₂(1/p(x))</span>, verifies a few properties, and moves on. This one refuses to write the formula until minute 24. The bet is that if you chase the compression question honestly you will be forced into <span class="mono">−log₂ p</span> with nowhere else to go, and that arriving under duress is different from being told. If you already know the formulas, the payoff of these thirty minutes is not the formulas but the <em>forcing</em> — seeing which constraint kills every alternative.</p>
+
+  <p>The other thing to watch for is stated <a class="lnk" href="https://youtu.be/l6DKRf-fAAM?t=188" target="_blank" rel="noopener">at 03:08</a>: Shannon could not answer "how compressible is English" without engaging some notion of intelligence. That is not a rhetorical flourish. The floor depends on the probability distribution you use, better distributions give lower floors, and the best available distribution over English is whatever the smartest available predictor believes. The floor is therefore not a fact about English. It is a fact about English <em>and your model of it</em>, which is why this question could not be finished in 1951 and is still moving.</p>
+
+  <h2 id="road">Where the series goes from here</h2>
+
+  <p>The arc is short and each step is forced by the previous one. As a map to keep beside you:</p>
+
+  <table class="kv">
+    <tr><th>concept</th><th>formula</th><th>reads as</th><th>page</th></tr>
+    <tr><td>Information</td><td><span class="mono">I(x) = log₂(1/p(x)) = −log₂ p(x)</span></td><td>bits to encode one outcome; "surprise"</td><td><a class="lnk" href="p04.html">P4</a></td></tr>
+    <tr><td>Entropy</td><td><span class="mono">H(p) = Σ p(x)·log₂(1/p(x))</span></td><td>average surprise; the compression floor</td><td><a class="lnk" href="p06.html">P6</a></td></tr>
+    <tr><td>Cross-entropy</td><td><span class="mono">H(p,q) = Σ p(x)·log₂(1/q(x))</span></td><td>bits paid when reality is <span class="mono">p</span> but your code assumed <span class="mono">q</span></td><td><a class="lnk" href="p09.html">P9</a></td></tr>
+    <tr><td>KL divergence</td><td><span class="mono">D(p‖q) = H(p,q) − H(p) ≥ 0</span></td><td>the excess — what your wrong model costs</td><td><a class="lnk" href="p15.html">P15</a></td></tr>
+    <tr><td>LLM loss</td><td><span class="mono">−(1/n) Σᵢ log q(xᵢ | x&lt;ᵢ)</span></td><td>cross-entropy against the observed token</td><td><a class="lnk" href="p12.html">P12</a></td></tr>
+  </table>
+
+  <p>Grant calls this <a class="lnk" href="https://youtu.be/l6DKRf-fAAM?t=123" target="_blank" rel="noopener">the first in a trilogy</a>. Part 1 is this video, ending at the noiseless coding theorem — the standard textbook name is the <em>source coding theorem</em>; both refer to the same result — and a number for the entropy of English. Part 2 — <a href="https://youtu.be/GlYgs6v2YfU" target="_blank" rel="noopener">"But what is cross-entropy?"</a> — defines cross-entropy, applies it to the language-trees-and-zipping result, derives the pre-training objective, and closes on KL divergence. As of this writing the third has not been published, so this map covers Parts 1 and 2 and will be extended when the third lands.</p>
+
+  <p>Immediately next, though, the maths starts small. <a class="lnk" href="p02.html">P2</a> puts a robot on a distant moon and gives it four possible instructions with probabilities <span class="mono">½, ¼, ⅛, ⅛</span>. Everything above is going to fall out of that toy.</p>
+
+  <h2 id="stuck">Where people get stuck</h2>
+
+  <p><b>"Prediction and compression are equivalent" does not mean an LLM is a zip utility you can run today.</b> The equivalence needs three things at once: a model, an entropy coder, and <em>bit-identical determinism on both ends</em>. The decoder has to reconstruct the encoder's intervals exactly, which means reproducing floating-point inference to the last bit across hardware, batch size, and kernel version. That is a genuine engineering obstacle, not a formality, and it is why LLM-based compressors are research demos rather than the thing on your laptop. The equivalence is mathematical; the deployment is hard.</p>
+
+  <p><b>Bits per token, bits per character, and bits per byte are three different numbers.</b> LLM loss is per <em>token</em>; classical results like Shannon's are per <em>character</em>; compression benchmarks report per <em>byte</em>. Converting between them requires knowing the average tokens-per-byte of the tokeniser, and comparisons that skip this step are routinely off by a factor of three or four. Always ask which denominator a quoted rate is using.</p>
+
+  <p><b>Nats versus bits.</b> A loss of "2.0" in a training log is almost always 2.0 nats, because the code called a natural log. In bits it is <span class="mono">2.0 / ln 2 = 2.885</span>. Multiplying by <span class="mono">1/ln 2 ≈ 1.4427</span> is the conversion, and forgetting it makes a model look 44% better at compression than it is.</p>
+
+  <p><b>Smaller output does not by itself mean smarter.</b> This is the decompressor problem again, and it is the single most common way the slogan is misused. A compressor that has memorised the evaluation corpus reports a spectacular ratio and has learned nothing. Every serious framing of the claim — the Hutter Prize's self-extracting archive rule included — exists to close exactly this hole.</p>
+
+  <h2 id="further">Going deeper, verified</h2>
+  <ul class="readings">
+    <li><a href="https://colah.github.io/posts/2015-09-Visual-Information/" target="_blank" rel="noopener">Visual Information Theory</a> — Christopher Olah (2015) · The post Grant credits in the description as the source of the visualisation of entropy used in this video; the best-drawn introduction to codes, entropy and KL that exists.</li>
+    <li><a href="https://people.math.harvard.edu/~ctm/home/text/others/shannon/entropy/entropy.pdf" target="_blank" rel="noopener">A Mathematical Theory of Communication</a> — Claude Shannon, <i>Bell System Technical Journal</i> (1948) · The founding paper. Sections 6–9 contain the definition of entropy and the noiseless coding theorem this video reconstructs from scratch.</li>
+    <li><a href="https://www.princeton.edu/~wbialek/rome/refs/shannon_51.pdf" target="_blank" rel="noopener">Prediction and Entropy of Printed English</a> — Claude Shannon, <i>Bell System Technical Journal</i> vol. 30 (1951) · The measurement, made with human guessers standing in for a language model. With 100 letters of context Shannon's experiments bracket English between about 0.6 and 1.3 bits per letter. Prediction used as a measuring instrument for compressibility is the direct ancestor of everything on this page.</li>
+    <li><a href="http://prize.hutter1.net/" target="_blank" rel="noopener">The Hutter Prize for Lossless Compression of Human Knowledge</a> — Marcus Hutter (2006, expanded 2020) · The slogan operationalised: compress the first gigabyte of English Wikipedia, scored on the combined size of archive plus decompressor. Read the rules page specifically for how it defends against hiding data in the decompressor. Note the site's HTTPS certificate is expired — the plain <span class="mono">http://</span> link above works.</li>
+    <li><a href="http://www.inference.org.uk/itprnn/book.pdf" target="_blank" rel="noopener">Information Theory, Inference, and Learning Algorithms</a> — David MacKay, Cambridge University Press (2003), free PDF · Chapter 5 is Huffman and its rounding losses; §6.2 is arithmetic coding, including the two-bits-for-the-whole-message bound quoted above. The single best follow-on if this page's middle section is the part you want to go deeper on.</li>
+  </ul>
+
+  <h2 id="exercises">Exercises</h2>
+  <ol class="exercises">
+    <li><b>Turn a loss into a file size</b> — Take a model reported at 2.4 nats/token on a corpus whose tokeniser averages 3.8 bytes per token. Compute its bits per token and bits per byte, and compare against 8 bits/byte for raw storage and about 2.8 for <span class="mono">gzip</span>. A good answer states the conversion factor <span class="mono">1/ln 2</span> explicitly, gets 3.463 bits/token and 0.911 bits/byte, and says in one sentence why that number is a claim about the corpus as much as about the model.</li>
+    <li><b>Build the interval by hand</b> — Using the five-token table above, compute the arithmetic coder's surviving interval step by step, starting from <span class="mono">[0, 1)</span> and assuming the encoded token occupies the bottom slice at each step. Verify the final width equals <span class="mono">3.6 × 10⁻⁵</span>, then find the shortest binary fraction inside it and count its bits. A good answer confirms the count is at most <span class="mono">⌈14.762⌉ + 1 = 16</span> bits and explains why the bound is a constant rather than per-symbol.</li>
+    <li><b>Run the cheat</b> — Compress a text file with <span class="mono">gzip</span> and record the size. Now concatenate the file with a second copy of itself and compress that. The doubled file should compress to only slightly more than the original. Explain the result in terms of <span class="mono">−log₂ P</span>: what probability did the compressor assign to the second half, and what does that say about the difference between "the size of the data" and "the size of the data given a model that has already seen it"? A good answer connects this directly to why the Hutter Prize counts the decompressor.</li>
+  </ol>
+
+  <div class="callout">Start of the map · Next: <a class="lnk" href="p02.html">P2 The warmup: four instructions, three students, and prefix codes</a> · Back to the <a class="lnk" href="../index.html#entropy">map</a>.</div>
+</main>
+<footer>Original explanation of 3Blue1Brown's <i>Reinventing Entropy | Compression is Intelligence Part 1</i>. The lesson and animations are Grant Sanderson's; this page links to them, it does not copy them.</footer>
+</body>
+</html>
