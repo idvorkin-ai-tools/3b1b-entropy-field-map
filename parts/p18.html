@@ -90,7 +90,7 @@ else:                                   colour = GREY</pre>
 
   <div class="callout"><b>The error has a sign.</b> Every disagreement is grey-in-Wordle, yellow-in-the-simulator; the shortcut can never lose a yellow. One line: if the <span class="mono">r</span>-th non-green copy is a true yellow then <span class="mono">r ≤ A − G</span>, and its guess-order index is <span class="mono">k = r + g</span> with <span class="mono">g ≤ G</span> the greens to its left, so <span class="mono">k ≤ A − G + g ≤ A</span> and the shortcut calls it yellow too. The two rules differ precisely when <span class="mono">g &lt; G</span> — some green sitting to the right. <i>(This argument and the measurements below are mine, not the video's; I checked the claim exhaustively against the repository's word lists — no exception in 636,483 mis-coloured squares.)</i></div>
 
-  <h2 id="scale">How big was it, in numbers</h2>
+  <h2 id="scale">How big was it, in numbers <a class="lnk" href="https://youtu.be/fRed0Xmc2Wg?t=0" target="_blank" rel="noopener">00:00</a></h2>
 
   <p>The video says "a very small percentage of cases" and leaves it there; the size of the effect is worth pinning down, because it is the whole lesson. <b>These are my measurements</b>, from implementing both rules and running them over every pair of words in the lists checked into the video's repository — 12,953 allowed guesses × 2,309 answers, 29.9 million pairs. (Grant quotes 2,315 answers and "13,000" guesses <a class="lnk" href="https://youtu.be/fRed0Xmc2Wg?t=437" target="_blank" rel="noopener">07:17</a>, so the last digit moves with the list.)</p>
 
@@ -136,11 +136,11 @@ else:                                   colour = GREY</pre>
 
   <p>No part of the information theory was implicated. <span class="mono">H(p) = Σ p(x)·log₂(1/p(x))</span> was correct; so was reading it as "how many times do you expect to halve the space of possibilities"; so were the bucket picture, the greedy-versus-two-step comparison, and the insistence that expected information is a heuristic for score rather than score itself. What was wrong sat strictly beneath all of it, in the function mapping (guess, answer) to an observation. The optimiser did its job perfectly on the model it was handed.</p>
 
-  <p>That is the failure mode worth internalising, because it is endemic in machine learning and it never announces itself: a leaked test set, an eval harness that normalises whitespace differently from the scorer, an off-by-one between tokens and labels, a reward model scoring fluency when you meant correctness, a simulator whose dynamics drift from the deployed ones. Each produces numbers that are precise, reproducible, internally consistent and about the wrong universe. Confidence is not evidence: a stronger optimiser pointed at a mis-specified objective gets you a <em>more</em> confidently wrong answer, faster.</p>
+  <p>That failure mode is endemic in machine learning and it never announces itself: a leaked test set, an eval harness that normalises whitespace differently from the scorer, an off-by-one between tokens and labels, a reward model scoring fluency when you meant correctness, a simulator whose dynamics drift from the deployed ones. Each produces numbers that are precise, reproducible, internally consistent and about the wrong universe. Confidence is not evidence: a stronger optimiser pointed at a mis-specified objective gets you a <em>more</em> confidently wrong answer, faster.</p>
 
   <p>The connection to the scoring-rule material on <a class="lnk" href="p13.html">P13</a> is sharp. Cross-entropy is a <em>proper</em> scoring rule — uniquely minimised by reporting your true beliefs, which is what licenses training against it. But propriety is a statement about a pair: the score, and the distribution you score against. <span class="mono">H(p, q)</span> is minimised at <span class="mono">q = p</span> for the <span class="mono">p</span> that actually generates your data, so if that data comes from a buggy simulator, the <span class="mono">p</span> in the guarantee is the simulator's distribution and not the world's. Minimising a proper score against the wrong <span class="mono">p</span> converges beautifully to the wrong beliefs. Propriety buys honesty about your model; it buys nothing about the measurement apparatus.</p>
 
-  <h2 id="catch">How would you have caught this</h2>
+  <h2 id="catch">How would you have caught this <a class="lnk" href="https://youtu.be/fRed0Xmc2Wg?t=92" target="_blank" rel="noopener">01:32</a></h2>
 
   <p>Concretely, in rough order of cost.</p>
 
